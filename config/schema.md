@@ -59,6 +59,10 @@ Operational, not configuration. Same database, `state` collection.
 Shared rows are readable by anyone who can open the artifact. **Never store
 credentials, tokens or vault item names.** Cloud ids and project keys are fine.
 
+`config/run.prohibitions` holds the hard limits — no email, no Slack writes. Calendar
+writes are permitted under the approval tiers in SKILL.md; `config/run.calendar` can
+lower that further per operator (for example, tier 1 only) but never raise it.
+
 Last-writer-wins, no transactions. Fine at twice a week; do not build anything that
 assumes atomicity.
 

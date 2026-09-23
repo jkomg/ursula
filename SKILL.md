@@ -30,8 +30,22 @@ State the active mode at the top of every session. An operator who thinks they a
 in dry-run and is not will find out the expensive way.
 
 **Prohibitions, in every mode.** The gateway exposes write tools well beyond Jira.
-Never send email, never post to Slack, never modify or decline a calendar event, and
-never write to a watched board. Flag; the operator acts.
+**Never send email. Never post, draft or react in Slack.** Those put words in the
+operator's mouth to other people, and nothing this skill does requires it.
+
+**Calendar writes are allowed, under approval, in tiers.** Blocking time is not the
+same act as sending a message, and a planning session that finds three collisions and
+cannot fix any of them is doing half a job. Never in `dry-run`.
+
+| Tier | Action | Gate |
+|---|---|---|
+| 1 | Create or move a focus block on the operator's own calendar, no other attendees | Propose in the batch; one approval covers several |
+| 2 | Decline or accept an invitation on the operator's behalf | Per-event approval. The organiser is notified, so name who finds out |
+| 3 | Modify or delete an event with other attendees, or invite anyone | Per-event approval, and state who is affected before asking |
+
+Never touch an event on a shared team calendar or one the operator does not own,
+at any tier, without tier-3 approval. When two operators run this skill, neither
+instance changes a meeting the other organises.
 
 ## Before anything else
 

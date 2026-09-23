@@ -98,8 +98,11 @@ We watch some of the same boards, so a couple of rules keep us out of each other
 
 ## What it can't do
 
-- It doesn't send email, post or draft in Slack, or touch your calendar. Everything
-  outside Jira is read-only. It flags; you act.
+- It never sends email and never posts, drafts or reacts in Slack. Those put words in
+  your mouth to other people.
+- It **can** work your calendar, but only with your say-so each time. Blocking your own
+  focus time is one approval; declining someone's invitation is a separate one, because
+  they get notified and you should know that before it happens.
 - It doesn't know anything about you at the start. My context doesn't transfer — yours
   builds from your own setup interview and your own weeks.
 - It won't find every commitment. It'll tell you where it couldn't look.
