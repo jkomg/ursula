@@ -68,6 +68,12 @@ Untitled notes documents are matched to the calendar by timestamp. Every extract
 item carries its source, so a ticket can always be traced back to the sentence that
 created it.
 
+**Finish with the coverage check.** List every accepted calendar event in the window,
+match each to a notes source, and report the ones with no source by name. Measured,
+automated mining found the origin of one ticket in six — the rest came from meetings
+that produced no reachable notes at all. The unmatched list is what Pass 0 is for, and
+a mining pass reported without it is a false clean bill of health.
+
 ### Pass 2 — reconcile
 
 Match every candidate against existing Jira **before creating anything**. The skip
@@ -75,11 +81,20 @@ rate is the point: a typical run finds that half the candidates already have
 tickets. Record the document-to-issue mapping in `state/ingested` so the next run
 does not re-ingest the same notes.
 
+Reconcile by scope, not by keyword. A broad `text ~` search across a large instance
+returns a capped page of mostly unrelated work and hides the one card that matters.
+Query the projects a candidate could plausibly live in, pull the open set, and match
+against that. See `reference/jira-conventions.md`.
+
 Read all configured boards, not just the owned ones:
 
 - **Owned** — full read and write
-- **Watched** — read only; findings become cards on the shared manager board,
-  never comments on the watched board itself
+- **Watched** — no *unsolicited* writes. Findings become cards on the shared manager
+  board rather than comments on someone's own board. But a direct instruction from
+  the operator overrides this: when they have promised someone an update on a
+  specific card, make it. The rule exists so two managers' tooling does not turn a
+  new hire's queue into a conversation between robots — not to stop the operator
+  keeping a promise they made in a one-to-one.
 - **Excluded** — templates and probes; never scanned for work, but see the
   template-propagation check below
 
@@ -157,8 +172,13 @@ fire twenty writes off a single "sounds good" — but once a scope is agreed
 ("fix NOM and CCC"), execute it fully without asking again per ticket.
 
 **Be specific about what did not happen.** If a board was unreachable, a query hit
-a result cap, or a check could not run, say so. A silent gap in a weekly review
-compounds for weeks.
+a result cap, a document could not be opened, or a check could not run, say so. A
+silent gap in a weekly review compounds for weeks.
+
+**State the expected result before a mining pass, then report the delta.** When the
+ingested map says only one source should be new, say so, and if five come back,
+that gap is the most useful output of the run. A pass that quietly absorbs a
+surprise has thrown away a defect report.
 
 **Never invent an owner, a date or a number.** Ask.
 

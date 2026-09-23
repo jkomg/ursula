@@ -44,6 +44,12 @@ something does not exist.
 Unscoped text searches across a large instance return mostly noise from unrelated
 projects. Scope to configured projects before searching by text.
 
+Even scoped, `text ~` is the wrong reconcile tool. Matching five candidates against
+one board by keyword returned a capped page dominated by unrelated training cards.
+Pull the board's open set once — `project = X AND statusCategory != Done` — and match
+candidates against that in memory. One query, no cap, no keyword guessing, and the
+full set is then available for the self-blocking and stale-parent checks anyway.
+
 ## Board queries
 
 The board is assignee-scoped with no project filter:
