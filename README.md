@@ -15,6 +15,7 @@ findings has done the easy half.
 ## Layout
 
 ```
+INSTALL.md                    short install guide — share this with the tarball
 SKILL.md                      the skill itself
 reference/
   analysis-checks.md          the nine checks, with worked examples
@@ -32,7 +33,9 @@ config/
 
 ## Start
 
-Read `docs/setup.md`. Setup is an interview, not a file edit — the operator answers
+**Handing this to someone? `INSTALL.md` is the page to send with the tarball.**
+
+Read `docs/setup.md` for the full version. Setup is an interview, not a file edit — the operator answers
 questions and Claude writes the config. Nobody needs to touch YAML.
 
 ## Three tiers of state

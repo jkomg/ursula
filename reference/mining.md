@@ -122,6 +122,34 @@ Then sweep for commitments made directly over mail — threads where the operato
 promised something, or was asked for something and has not replied. These never
 appear in meeting notes and are a common source of self-blocking findings.
 
+## Slack
+
+Meeting notes capture meetings. Slack captures everything else, and a measurable share
+of commitments never reach a meeting at all. Two days of messages surfaced three
+commitments with no ticket behind any of them: a document review requested of the
+operator, a blocked new hire asking a question that stalled their onboarding, and a
+promise the operator made to a colleague about checking access.
+
+**Read-only. Never post, never draft, never react.**
+
+Three targeted searches, not a general sweep:
+
+1. **Direct messages since the watermark** — `is:dm after:<date>`. Where requests and
+   promises actually live.
+2. **Mentions of the operator with no reply from them** — the strongest self-blocking
+   signal available anywhere, and Slack is where it lives.
+3. **Named channels from config** — the two or three that carry real work.
+
+**Filter out app DMs or the signal drowns.** Thirteen of twenty results in the measured
+run were notification DMs from Jira, Google Calendar and Google Drive. These are app
+conversations, not bot messages, so the `include_bots` flag does not exclude them.
+Drop any DM whose counterpart is an installed app by name, and keep a list of those
+names in config.
+
+Extract the same things as from notes: requests made *of* the operator, promises made
+*by* them, and questions left unanswered. A question to the operator that has sat
+unanswered while the asker is blocked is a finding, not a task.
+
 ## Calendar
 
 - The cadence window ahead, for collisions and for the real shape of the week

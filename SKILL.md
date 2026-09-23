@@ -59,8 +59,10 @@ the question comes at the end it gets skipped.
 Everything since the watermark. See `reference/mining.md` for the queries and the
 naming patterns.
 
-- Google Drive: Gemini notes documents
-- Gmail: the same notes as a cross-check, plus direct commitments made over email
+- Google Drive: Gemini notes documents — the main source
+- Slack: direct messages, unanswered mentions, named channels. Read-only.
+- Gmail: one query as a cross-check, plus direct commitments made over email. It is a
+  subset of Drive for notes; do not build on it.
 - Calendar: the week ahead, and any event descriptions that changed
 - Any documents the operator has been sent since the last run
 

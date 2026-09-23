@@ -132,3 +132,13 @@ were not found.
 Defect 8 is the finding that matters most across all three runs. Everything before it
 was plumbing. This one says the automated pass cannot be the primary source, and that
 the operator's own fifteen minutes is load-bearing rather than polite.
+
+## 2026-09-23 — Slack source evaluation
+
+Two days of direct messages surfaced three commitments with no ticket behind any of
+them, none of which any notes document contained. Slack is added as a first-class
+source, read-only.
+
+| Finding | Fix |
+|---|---|
+| 13 of 20 DM results were notification DMs from Jira, Google Calendar and Google Drive. `include_bots: false` does not exclude them — they are app *conversations*. | Maintain an app-DM exclusion list in config and filter by counterpart name. |
