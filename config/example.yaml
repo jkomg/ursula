@@ -1,0 +1,53 @@
+# Reference only. Setup writes this into the artifact database by interview.
+# Values below are illustrative.
+
+jira:
+  cloud_id: "00000000-0000-0000-0000-000000000000"
+  owned:    [OPSA, OPSB, OPSC, OPSD]
+  watched:  [RPTA, RPTB, RPTC]
+  shared_manager_board: MGRQ
+  excluded: [TMPL1, TMPL2, PROBE]
+  transitions:
+    to_do: "11"
+    in_progress: "21"
+    blocked: "31"
+    done: "41"
+
+labels:
+  priority: ursula
+  week_format: "w{iso_week}"
+  review: needs-review
+
+cadence:
+  plan:  { day: monday,   time: "13:00", tz: America/New_York }
+  retro: { day: thursday, time: "13:00", tz: America/New_York }
+  onepager:
+    recipient: "<manager name>"
+    due: "thursday 21:00"
+    sections:
+      - what moved
+      - blocked, and on whom
+      - decisions needed, each with a recommendation
+      - risks that bite in 30 days
+      - numbers
+
+numbers:
+  - label: "hires onboarded"
+    source: jql
+    query: 'project IN (RPTA, RPTB, RPTC) AND status = Done AND labels = "phase1-gate"'
+  - label: "items flagged by new hires"
+    source: jql
+    query: 'project IN (RPTA, RPTB, RPTC) AND labels = "needs-review"'
+  - label: "pillars with owners"
+    source: manual
+    note: "Audit does not assign departmental owners. Report status plus candidates."
+
+people:
+  - { name: "<manager>",  role: manager,       email: manager@example.com }
+  - { name: "<peer>",     role: partner,       email: peer@example.com, watch_drive: true }
+  - { name: "<report 1>", role: direct_report, email: r1@example.com, board: RPTA }
+
+policies:
+  - name: per-person credentials
+    statement: "No shared service accounts. Per-person access with expiry dates."
+    ticket: OPSA-99
