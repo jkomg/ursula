@@ -29,8 +29,13 @@ produce neither.
 So every mining pass ends with a **coverage check**:
 
 1. List every calendar event in the window that the operator accepted.
-2. Match each against the notes sources found.
-3. Report the unmatched ones by name, and ask the operator what came out of them.
+2. Take the attached documents from each; then run the Drive search and fold in
+   anything it found that no event carried.
+3. Report events with no attachment and no matching document, by name, and ask the
+   operator what came out of them.
+
+Do not skip the Drive pass — an ad-hoc call that never had a calendar entry produces a
+document and no event. The two passes cover different gaps.
 
 This is the step that turns a sweep finding one-sixth of the week into a sweep the
 operator can trust. It also makes Pass 0 — the operator's own fifteen minutes — load
@@ -41,7 +46,27 @@ Never report a mining pass as complete without the coverage check. A list of six
 documents looks thorough and can still be missing the two meetings that generated most
 of the week's work.
 
-## Google Drive — the primary source
+## Calendar attachments — the primary index
+
+**Notes documents are attached to their calendar events.** Read the event list for the
+window with attachments and take the document ids from there. The calendar already
+knows which document belongs to which meeting, which removes every hard problem in the
+Drive-search approach at once: no timestamp matching for untitled meetings, no
+shortcut-versus-target dedupe, and no assumption about how the document is named.
+
+Measured against a real three-day window, a Drive title search missed four documents
+that were sitting in plain view as calendar attachments:
+
+* a one-to-one whose notes existed but were reported as missing
+* two meetings that produced **two** notes documents each, only one of which the search
+  found
+* the most important meeting of the week, whose notes were titled `Notes - <meeting>`
+  rather than `<meeting> - Notes by Gemini`, so no title pattern could reach it
+
+Take everything from the attachment list: notes, recordings, pre-reads, spreadsheets.
+An event with no attachment is a genuine coverage gap and goes on the list to ask about.
+
+## Google Drive — the backstop, not the primary source
 
 Meeting notes are Google Docs owned by the operator, named:
 

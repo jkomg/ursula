@@ -40,15 +40,17 @@ it — that isn't something you can fix by retrying.
 
 ## Install
 
-```sh
-tar -xzf ursula.tar.gz
-cd ursula
-```
+**Run this in claude.ai, not Claude Code.** Your connectors are already provisioned
+there, and the config, state and board all live in a claude.ai artifact that Claude
+Code cannot reach. Claude Code is the right place to *edit* this repo; it is not where
+the skill runs.
 
-Claude Code: point it at the folder. Claude.ai: add the skill through the Skills menu.
+1. Extract the tarball.
+2. Add the skill through the Skills menu in claude.ai.
+3. Start a chat and say: **"set up Ursula"**.
 
-Then just say: **"set up Ursula"**. It reads `docs/setup.md` and interviews you. You
-don't edit any files.
+It reads `docs/setup.md` and interviews you. You don't edit any files, and you never
+touch YAML.
 
 ## Have these answers ready
 
@@ -84,6 +86,33 @@ Switch to `live` when two runs in a row look right.
 
 The first run is noisy — it sees two weeks at once and over-proposes. Rejecting things
 is how it learns what you care about, so reject freely.
+
+## After setup — what the weeks look like
+
+Setup happens once. After that there is no installation, no commands, and nothing to
+maintain. You open a chat and say what you want.
+
+**Monday, about an hour.** Say *"let's do the Monday plan"*.
+
+It opens by asking you to spend fifteen minutes with your own notes and then waits —
+that pause is deliberate, and it is the most valuable input of the week. Then it sweeps
+Drive, Slack, Gmail and your calendar, matches everything against Jira, tells you which
+meetings it could not find notes for, runs the nine checks, and proposes a set of tags,
+dates and tickets. You approve or reject each one. In dry-run it stops there and shows
+you the list rather than acting.
+
+**Thursday, about forty minutes.** Say *"let's do the retro"*.
+
+What moved, what is blocked and on whom, and your one-pager assembled from notes it has
+been staging on a ticket all week. Then it runs the checks again, because a week of new
+information usually breaks something you agreed on Monday.
+
+**In between**, nothing scheduled. Paste it something and say *"anything in here for
+me?"* when a meeting throws off commitments. Ask it to prep a one-to-one. Ask what is
+blocked. It is a standing thing you can talk to, not a job that runs.
+
+**Your board** is a link you keep. It reads Jira and your calendar live, so it is
+current whenever you open it, and it carries week to week rather than being rebuilt.
 
 ## Two of us running this
 

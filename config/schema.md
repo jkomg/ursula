@@ -1,5 +1,9 @@
 # Config schema
 
+**This assumes claude.ai.** Config and state live in the operator's artifact database,
+which Claude Code cannot reach. Running the skill from Claude Code would need a
+file-based config and would have no board; that path is not built.
+
 Config lives in the operator's artifact database, collection `config`. The YAML in
 this directory is a reference and an export format — it is not the input path.
 Setup is a conversation.

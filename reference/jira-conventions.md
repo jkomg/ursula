@@ -8,9 +8,10 @@ Read before any write. Most of these were learned by getting them wrong.
 
 Workflow transition ids are usually uniform across a company's projects — commonly
 `11` To Do, `21` In Progress, `31` Blocked, `41` Done — but confirm at setup and
-store them in config. `getTransitionsForJiraIssue` **excludes the current status**,
-so it shows where an issue can go, not where it is. Surface available transitions as
-explicit choices; never infer one.
+store them in config. `getTransitionsForJiraIssue` returns the workflow's global transitions, **including
+one to the issue's current status** — an issue in To Do lists To Do among them. Do not
+infer the current status from the transition list; read the issue's `status` field.
+Surface available transitions as explicit choices; never guess an id.
 
 ## The label-replacement trap
 

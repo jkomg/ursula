@@ -91,6 +91,65 @@ part most people skip and later wish they hadn't.
 
 An existing artifact URL to adopt, or permission to publish a new one.
 
+## 3b. Completion contract
+
+The interview is a conversation, not a script — but it is **done** only when every item
+below is true. Claude must not report setup as complete otherwise.
+
+### Required state
+
+Nine documents, every field populated or explicitly recorded as unknown with a reason:
+
+`config/jira` · `config/labels` · `config/cadence` · `config/numbers` ·
+`config/people` · `config/policies` · `config/run` · `state/watermark` ·
+`state/ingested`
+
+A field left out silently is a failure. A field recorded as `null` with a note saying
+why is acceptable and gets reported.
+
+### Verification — by execution, never by assertion
+
+Claude must **run each of these and report the actual result**. "Configured correctly"
+is not an acceptable answer; the output of the check is.
+
+| # | Check | Passes when |
+|---|---|---|
+| 1 | Query every declared project key | Each resolves to a real project. A typo'd key returns nothing and must be caught here, not in week three |
+| 2 | Read transition ids off a real ticket in an owned project | Ids are observed, not assumed from another operator's config |
+| 3 | Run the board JQL | Returns a count. Zero is a finding to report, not a failure — it usually means nothing is labelled yet |
+| 4 | Run one Drive notes query over the last 14 days | Returns documents, paginated to exhaustion |
+| 5 | Run one Gmail query and one Slack DM query | Both return without an auth error |
+| 6 | Read the cadence window from the calendar | The planning and retro sessions exist, or Claude offers to create them under tier 1 |
+| 7 | Run the coverage check once | Names any meetings in the last week with no notes source |
+| 8 | Publish the board | Returns a URL the operator can open |
+| 9 | Read the whole config back to the operator | They confirm it aloud |
+
+### Refusal
+
+If any check fails, Claude writes `config/run.status = "incomplete"` with the list of
+what failed, tells the operator plainly, and **does not proceed to a first planning
+session.** A setup reported as complete with a broken project key produces a month of
+quietly wrong runs.
+
+### What a good first run looks like
+
+The first planning session is the real acceptance test. Rough shape, from measured runs:
+
+- **Sources found** — several documents, and a coverage list naming the meetings it
+  could not reach. A run reporting full coverage is almost certainly wrong.
+- **Skip rate** — roughly half of extracted candidates should already have tickets. A
+  run creating everything it finds is not reconciling.
+- **Findings** — at least two or three from the nine checks, with evidence and a
+  recommendation each. **Zero findings means the analysis pass did not run.** That is
+  the single clearest sign of a lazy run, because the checks are the point.
+- **Tag proposals** — ranked, with a recommendation on each, and the operator rejecting
+  a good number of them.
+- **What it could not do** — stated explicitly. Every run ends with this, even when the
+  answer is nothing.
+
+A run that produces tidy tickets, no coverage list and no findings has done the easy
+half and should be called out as such rather than accepted.
+
 ## 4. First run
 
 Claude sets an initial watermark — usually two weeks back — publishes the board, and

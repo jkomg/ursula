@@ -142,3 +142,24 @@ source, read-only.
 | Finding | Fix |
 |---|---|
 | 13 of 20 DM results were notification DMs from Jira, Google Calendar and Google Drive. `include_bots: false` does not exclude them — they are app *conversations*. | Maintain an app-DM exclusion list in config and filter by counterpart name. |
+
+## 2026-09-23 — completion-contract dry run
+
+Ran the nine setup verification checks against a live config.
+
+**Passed:** all twelve project keys resolve (JQL fails atomically on a bad key, so one
+query tests them all) · transition ids confirmed 11/21/31/41 and `isGlobal`, which is
+why they are uniform · board JQL returns 33 · Drive, Gmail, Slack and calendar all
+respond. Board publish was not executed against a live artifact.
+
+**Two defects, one of them the most significant so far.**
+
+| # | Defect | Fix |
+|---|---|---|
+| 10 | **Notes documents are calendar-event attachments.** A Drive title search missed four: a one-to-one reported as having no notes when it did, two meetings that produced two documents each, and the week's most important meeting, whose notes were titled `Notes - <meeting>` rather than `<meeting> - Notes by Gemini`. | Calendar attachments are the primary index. Drive search becomes the backstop for unattached documents. |
+| 11 | `jira-conventions.md` claimed `getTransitionsForJiraIssue` excludes the current status. It does not — an issue in To Do lists To Do among its transitions. | Correct the note. |
+
+Defect 10 supersedes much of defect 8's framing. Coverage is better than measured —
+the sweep was looking in the wrong place first, not failing to reach the documents.
+Genuinely unreachable meetings remain: recurring syncs and ad-hoc calls with no
+attachment and no document anywhere.

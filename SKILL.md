@@ -51,7 +51,9 @@ instance changes a meeting the other organises.
 
 1. **Load config.** Read `config/*` from the operator's artifact database
    (`read_db`, collection `config`). No config means this is a first run — go to
-   `docs/setup.md` and do the interview. Never guess project keys or cadence.
+   `docs/setup.md`, do the interview, and satisfy its **completion contract** before
+   anything else. Never guess project keys or cadence.
+   If `config/run.status` is `incomplete`, say what is missing and fix that first.
 2. **Confirm connectors.** Atlassian, Google Drive, Gmail and Calendar must be
    present. If Atlassian is missing, stop and say so — see
    `docs/troubleshooting.md`, because the artifact board keeps working while chat
@@ -231,3 +233,14 @@ they accept eight, and flags one calendar collision.
 
 A Monday run that produces twenty tidy tickets and no findings has done the easy
 half and called it done.
+
+Every run ends with four things, and a run missing any of them is incomplete:
+
+1. **The coverage list** — meetings with no notes source, by name. Reporting full
+   coverage is almost always wrong.
+2. **The skip count** — how many candidates already had tickets. Near zero means
+   reconciliation did not happen.
+3. **The findings** — from the nine checks, with evidence and a recommendation.
+   None is a red flag, not a clean bill of health; say which checks ran clean.
+4. **What could not be done** — unreachable boards, capped queries, unopenable
+   documents, checks that could not run.
