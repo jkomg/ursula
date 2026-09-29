@@ -8,14 +8,10 @@ Expect fifteen minutes.
 
 ## 1. Install
 
-```bash
-git clone <repo-url> ~/ursula
-```
-
-Claude Code: point it at the folder, or copy `SKILL.md` and its `reference/`
-directory into your skills location.
-
-Claude.ai: attach the skill through the Skills menu.
+Add the skill through the Skills menu in claude.ai. Run it there, not in Claude Code:
+the connectors are provisioned in claude.ai, and config, state and the board live in a
+claude.ai artifact that Claude Code cannot reach (`config/schema.md`). Claude Code is
+where the repo is edited, not where the skill runs.
 
 ## 2. Turn on connectors
 
@@ -24,10 +20,14 @@ a complete one.
 
 | Connector | Used for |
 |---|---|
-| Atlassian | Reading and writing Jira |
-| Google Drive | Meeting-notes documents, shared material |
-| Gmail | Notes index, direct commitments |
-| Google Calendar | Cadence window, collisions, changed expectations |
+| Atlassian | Reading and writing Jira; reading Confluence for the `content-cleanup` pack |
+| Custom Google Drive | The Mirantis-built gateway: Gmail, Calendar, Docs, Sheets |
+| Google Drive | Google's own. Finding and reading meeting-notes documents |
+| Slack | Read-only. Commitments that never reach a meeting |
+
+There is no separate Gmail or Calendar connector; both come through the gateway. An
+earlier version of this table listed them separately, which sent an operator looking
+for connectors that do not exist.
 
 On a Team or Enterprise plan an owner must enable a connector for the organisation
 before you can authenticate it. If you see a **request** button where a toggle
@@ -87,6 +87,22 @@ Your written operating rules, the ones a proposal might quietly contradict. Tick
 references where they exist. This drives the policy-conflict check, and it is the
 part most people skip and later wish they hadn't.
 
+### Packs
+
+Which domain packs match the operator's work (`reference/analysis-checks.md`). Ask what
+the work is, then propose packs; do not enable one by default.
+
+- **`service-delivery`** — onboarding people onto boards cloned from templates,
+  arranging their access. No extra questions.
+- **`content-cleanup`** — a Confluence cleanup backlog. Ask every field in
+  `reference/packs/content-cleanup.md` → Config: the spaces, the staleness threshold,
+  exempt labels, what "owned" means, bulk-edit accounts, the backlog project, and how
+  findings batch into tickets. None of these has a default. The backlog project must
+  also be declared as owned.
+
+An operator can enable none, one or both. With none, say so in the config read-back:
+the run is the core checks only.
+
 ### Board
 
 An existing artifact URL to adopt, or permission to publish a new one.
@@ -98,11 +114,11 @@ below is true. Claude must not report setup as complete otherwise.
 
 ### Required state
 
-Nine documents, every field populated or explicitly recorded as unknown with a reason:
+Ten documents, every field populated or explicitly recorded as unknown with a reason:
 
 `config/jira` · `config/labels` · `config/cadence` · `config/numbers` ·
-`config/people` · `config/policies` · `config/run` · `state/watermark` ·
-`state/ingested`
+`config/people` · `config/policies` · `config/packs` · `config/run` ·
+`state/watermark` · `state/ingested`
 
 A field left out silently is a failure. A field recorded as `null` with a note saying
 why is acceptable and gets reported.
@@ -124,6 +140,20 @@ is not an acceptable answer; the output of the check is.
 | 8 | Publish the board | Returns a URL the operator can open |
 | 9 | Read the whole config back to the operator | They confirm it aloud |
 
+With `content-cleanup` enabled, also:
+
+| # | Check | Passes when |
+|---|---|---|
+| C1 | Resolve every space key with `getConfluenceSpaces` | Each returns a space; its numeric id is stored in `space_ids` |
+| C2 | List one space's pages to exhaustion | Reports the page count and the number of calls it took. A count of exactly 25, 100 or 250 on one call means the cursor was not followed |
+| C3 | Read one page and show the operator the raw fields returned | Records which of owner, creator, last modifier, parent and labels the connector actually carries — the pack depends on this and the file marks it *observe at setup* |
+| C4 | Run the staleness CQL once with `stale_days` | Returns a count per space. Show the operator the ten oldest so they can judge the threshold |
+| C5 | Pull the backlog project's open set and match it to pages by id | Reports how many tickets carry a page link and how many name a page by title only |
+
+Write what C3 observed back into `reference/packs/content-cleanup.md` on the next edit
+of the repo, and log it in `test/golden-week.md`. Until then, the owner and orphan
+checks run on a guessed shape, and the report must say so.
+
 ### Refusal
 
 If any check fails, Claude writes `config/run.status = "incomplete"` with the list of
@@ -139,7 +169,7 @@ The first planning session is the real acceptance test. Rough shape, from measur
   could not reach. A run reporting full coverage is almost certainly wrong.
 - **Skip rate** — roughly half of extracted candidates should already have tickets. A
   run creating everything it finds is not reconciling.
-- **Findings** — at least two or three from the nine checks, with evidence and a
+- **Findings** — at least two or three from the core checks and enabled packs, with evidence and a
   recommendation each. **Zero findings means the analysis pass did not run.** That is
   the single clearest sign of a lazy run, because the checks are the point.
 - **Tag proposals** — ranked, with a recommendation on each, and the operator rejecting

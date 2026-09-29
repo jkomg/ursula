@@ -21,15 +21,35 @@ request and response for that tool in session. Never publish a guessed shape.
 
 ## Structure
 
-- **This week** — tagged items, sorted by due date ascending then priority. Undated
-  items sink to the bottom; that is correct.
-- **Calendar** — the cadence window, with collisions marked.
-- **Watched boards** — blocked and review-flagged items from reports' boards.
-- **Findings** — open findings from the analysis pass, newest first, each with its
-  evidence and recommendation.
-- **Log** — the running tally. One entry per session. This is the tab that answers
-  "what happened three weeks ago," and it is the reason the state lives in the
-  database rather than in Claude's memory.
+Three tabs. The selected tab is remembered per browser.
+
+- **This week** — tagged items read live from Jira, sorted by due date ascending then
+  priority, and the calendar for the week with open time. Undated items sink to the
+  bottom; that is correct.
+- **Findings** — the `findings` collection, open ones ordered by `rank`, closed ones
+  folded underneath. Each shows evidence, consequence, recommendation and links. The
+  operator can mark one resolved or not a finding (with a reason); that writes back to
+  the database for the next session, never to Jira.
+- **Log** — the `runs` collection, newest first. One entry per session. This is the tab
+  that answers "what happened three weeks ago," and it is the reason the state lives in
+  the database rather than in Claude's memory. An entry missing the coverage list, skip
+  count or could-not list is marked *not recorded*.
+
+Field shapes for both collections are in `config/schema.md`; change them there first,
+then the page. Findings and Log read the database only — they work when Jira is
+unreachable, which is also when they are most useful.
+
+Not built yet: a **Watched boards** tab (blocked and review-flagged items from reports'
+boards). The Thursday sweep produces it in chat for now.
+
+## Publishing this version
+
+`artifact/index.html` is the baseline. It needs the capabilities the live board already
+has — `mcp` (Atlassian: `getAccessibleAtlassianResources`, `searchJiraIssuesUsingJql`,
+`getTransitionsForJiraIssue`, `transitionJiraIssue`, `addCommentToJiraIssue`; Custom
+Google Drive: `google_calendar_events_list`), `db` and `user` — and no new ones. So
+republish it to the existing URL **with `capabilities` omitted**. Passing a set would
+replace the stored one and risk dropping a connector grant.
 
 ## Updating
 

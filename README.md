@@ -15,10 +15,14 @@ findings has done the easy half.
 ## Layout
 
 ```
-INSTALL.md                    short install guide — share this with the tarball
+INSTALL.md                    short install guide — share this with the zip
+bin/install.sh                checks the skill and builds the zip — see docs/release.md
 SKILL.md                      the skill itself
 reference/
-  analysis-checks.md          the nine checks, with worked examples
+  analysis-checks.md          the core checks, and how packs work
+  packs/
+    service-delivery.md       onboarding, access grants, templated boards
+    content-cleanup.md        Confluence: stale, orphaned, duplicate, unowned pages
   mining.md                   queries, naming patterns, untitled meetings
   jira-conventions.md         transition ids, label trap, response envelopes
   artifact-board.md           board structure and capabilities
@@ -33,7 +37,7 @@ config/
 
 ## Start
 
-**Handing this to someone? `INSTALL.md` is the page to send with the tarball.**
+**Handing this to someone? Run `bin/install.sh` and send the zip with `INSTALL.md`.**
 
 Read `docs/setup.md` for the full version. Setup is an interview, not a file edit — the operator answers
 questions and Claude writes the config. Nobody needs to touch YAML.

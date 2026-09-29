@@ -42,6 +42,20 @@ numbers:
     source: manual
     note: "Audit does not assign departmental owners. Report status plus candidates."
 
+packs:
+  enabled: [service-delivery]
+  # Only when content-cleanup is enabled. Every value is asked in the interview;
+  # none of these is a default.
+  # content-cleanup:
+  #   spaces: [DOCS, OPS]
+  #   space_ids: { DOCS: "123456", OPS: "234567" }
+  #   stale_days: 180
+  #   exempt_labels: [policy, decision, minutes]
+  #   owner_rule: "page owner field, falling back to creator"
+  #   bulk_editors: ["<migration app name>"]
+  #   backlog_project: OPSD
+  #   ticket_batching: per-check-per-space
+
 people:
   - { name: "<manager>",  role: manager,       email: manager@example.com }
   - { name: "<peer>",     role: partner,       email: peer@example.com, watch_drive: true }

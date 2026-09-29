@@ -105,8 +105,31 @@
   .empty{border:1px dashed var(--line);border-radius:8px;padding:22px;color:var(--dim);
     font-size:14px;text-align:center;margin-top:20px}
   .empty code{background:var(--accent-soft);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:13px}
+  .tabs{display:flex;gap:4px;margin:22px 0 0;border-bottom:1px solid var(--line);overflow-x:auto}
+  .tabs button{border:0;background:transparent;color:var(--dim);font:inherit;font-size:12px;font-weight:700;
+    letter-spacing:.1em;text-transform:uppercase;padding:9px 12px;cursor:pointer;border-bottom:2px solid transparent;
+    margin-bottom:-1px;white-space:nowrap}
+  .tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+  .tabs button .n{font-weight:400;letter-spacing:0;margin-left:5px}
+  .view[hidden]{display:none}
+  .fnd{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:8px;padding:12px 14px;margin-bottom:9px}
+  .fnd.closed{border-left-color:var(--line);opacity:.6}
+  .fnd h4{margin:0;font-size:15px}
+  .fnd dl{margin:8px 0 0;display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;font-size:13.5px}
+  .fnd dt{color:var(--dim);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding-top:2px}
+  .fnd dd{margin:0;min-width:0;overflow-wrap:anywhere}
+  .fnd .acts{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px dashed var(--line)}
+  .run{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:9px}
+  .run .top b{font-size:15px}
+  .run .nums{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px;font-size:13px;color:var(--dim)}
+  .run .nums span b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .run ul{margin:6px 0 0;padding-left:18px;font-size:13.5px}
+  .run .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-top:9px}
+  .run.partial{border-left:3px solid var(--should)} .run.failed{border-left:3px solid var(--err)}
   footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px}
-  @media(max-width:600px){ .top{flex-wrap:wrap} .st{order:3} .day{flex-wrap:wrap} .day b{flex-basis:100%} }
+  @media(max-width:600px){ .top{flex-wrap:wrap} .st{order:3} .day{flex-wrap:wrap} .day b{flex-basis:100%}
+    .fnd dl{grid-template-columns:1fr} .fnd dt{padding-top:6px} }
 </style>
 </head>
 <body>
@@ -114,9 +137,16 @@
 <header>
   <div class="eyebrow">Ursula</div>
   <h1 id="hdr">This week</h1>
-  <p class="sub">Your open work and your actual week, read live. Status changes write back; notes post as comments when you send them.</p>
+  <p class="sub">Your open work and your actual week, read live. Status changes write back; notes post as comments when you send them. Findings and the log are what each session recorded.</p>
 </header>
 
+<nav class="tabs" role="tablist">
+  <button role="tab" data-tab="week" aria-selected="true">This week</button>
+  <button role="tab" data-tab="findings" aria-selected="false">Findings<span class="n" id="fcount"></span></button>
+  <button role="tab" data-tab="log" aria-selected="false">Log<span class="n" id="lcount"></span></button>
+</nav>
+
+<div class="view" id="v-week">
 <div class="meter">
   <b id="pct">—</b>
   <div class="bar"><i id="fill"></i></div>
@@ -130,6 +160,17 @@
 </div>
 
 <div id="lanes"></div>
+</div>
+
+<div class="view" id="v-findings" hidden>
+  <div id="fstatus" class="sync" style="margin-top:14px"></div>
+  <div id="findings"></div>
+</div>
+
+<div class="view" id="v-log" hidden>
+  <div id="lstatus" class="sync" style="margin-top:14px"></div>
+  <div id="runs"></div>
+</div>
 
 <footer id="foot">Jira is the record. This is the view.</footer>
 </div>
@@ -574,6 +615,215 @@ function showDiagnostics(){
   host.appendChild(sec);
 }
 
+/* ---------- tabs ---------- */
+const TABS = ["week","findings","log"];
+function showTab(t){
+  if(!TABS.includes(t)) t = "week";
+  for(const b of document.querySelectorAll(".tabs button"))
+    b.setAttribute("aria-selected", b.dataset.tab === t ? "true" : "false");
+  for(const k of TABS) $("v-" + k).hidden = k !== t;
+  try{ localStorage.setItem("ursula.tab", t); }catch(e){}
+}
+for(const b of document.querySelectorAll(".tabs button"))
+  b.addEventListener("click", () => showTab(b.dataset.tab));
+
+/* ---------- findings and run log ----------
+   Written by the Ursula session through ArtifactData, read here. Shapes are
+   defined in config/schema.md — change them there first. Bodies are shared
+   data: render with textContent only, never innerHTML. */
+const str = v => (v === undefined || v === null) ? "" : String(v);
+const arr = v => Array.isArray(v) ? v : [];
+function el(tag, cls, text){
+  const e = document.createElement(tag);
+  if(cls) e.className = cls;
+  if(text !== undefined) e.textContent = text;
+  return e;
+}
+function dbErr(e){
+  const c = e && e.code;
+  if(c === "revoked" || c === "not_granted" || c === "capability_disabled") return "database not available in this view";
+  if(c === "resource_exhausted") return "too many requests — reload in a minute";
+  return "couldn't read the database (" + (c || "unknown") + ")";
+}
+
+let findings = [], showClosed = false;
+const OPEN = new Set(["open","carried"]);
+function renderFindings(){
+  const host = $("findings"); host.innerHTML = "";
+  const open = findings.filter(f => OPEN.has(str(f.status) || "open"));
+  const closed = findings.filter(f => !OPEN.has(str(f.status) || "open"));
+  $("fcount").textContent = open.length ? String(open.length) : "";
+  if(!findings.length){
+    host.appendChild(el("div","empty","No findings recorded yet. The next planning or retro session writes them here."));
+    return;
+  }
+  // Ordered by consequence as the session ranked it, then most recently seen.
+  const byRank = (a,b) => (Number(a.rank) || 999) - (Number(b.rank) || 999) ||
+    str(b.last_seen).localeCompare(str(a.last_seen));
+  open.sort(byRank);
+  closed.sort((a,b) => str(b.closed_at || b.last_seen).localeCompare(str(a.closed_at || a.last_seen)));
+  if(!open.length) host.appendChild(el("div","empty","Nothing open. Every recorded finding has been resolved or dismissed."));
+  for(const f of open) host.appendChild(findingCard(f));
+  if(closed.length){
+    const h = el("h2");
+    h.style.cursor = "pointer"; h.style.color = "var(--dim)";
+    h.textContent = "Closed";
+    const em = el("em", "", closed.length + (showClosed ? " · click to hide" : " · click to show"));
+    h.appendChild(em);
+    h.addEventListener("click", () => { showClosed = !showClosed; renderFindings(); });
+    host.appendChild(h);
+    if(showClosed) for(const f of closed) host.appendChild(findingCard(f));
+  }
+}
+function findingCard(f){
+  const status = str(f.status) || "open";
+  const c = el("article", "fnd" + (OPEN.has(status) ? "" : " closed"));
+  c.appendChild(el("h4", "", str(f.title) || str(f.key)));
+  const tg = el("div","tags");
+  tg.appendChild(el("span","tag key", str(f.check) || "check?"));
+  if(f.pack && f.pack !== "core") tg.appendChild(el("span","tag", str(f.pack)));
+  tg.appendChild(el("span", "tag" + (status === "carried" ? " od" : ""), status));
+  if(f.first_seen) tg.appendChild(el("span","tag","since " + str(f.first_seen).slice(0,10)));
+  for(const r of arr(f.refs)){
+    if(!r) continue;
+    const url = str(r.url);
+    if(/^https:\/\//.test(url)){
+      const a = el("a","tag", str(r.label) || url); a.href = url; a.target = "_blank"; a.rel = "noopener";
+      tg.appendChild(a);
+    } else if(r.label) tg.appendChild(el("span","tag", str(r.label)));
+  }
+  c.appendChild(tg);
+  const dl = el("dl");
+  for(const [k,label] of [["evidence","Evidence"],["consequence","Consequence"],["recommendation","Recommend"]]){
+    if(!f[k]) continue;
+    dl.appendChild(el("dt","",label)); dl.appendChild(el("dd","",str(f[k])));
+  }
+  if(!OPEN.has(status) && f.close_note){ dl.appendChild(el("dt","","Closed")); dl.appendChild(el("dd","",str(f.close_note))); }
+  c.appendChild(dl);
+
+  // The operator's verdict goes back to the database; the next session reads it
+  // and stops re-raising the finding. The session, not the page, changes Jira.
+  if(db && canWrite !== false){
+    const acts = el("div","acts");
+    const sync = el("span","sync");
+    const form = el("div"); form.style.cssText = "display:none;width:100%";
+    const note = el("textarea","note"); note.rows = 1;
+    const save = el("button","push","Save");
+    const cancel = el("button","move","Cancel");
+    const frow = el("div","row"); frow.appendChild(save); frow.appendChild(cancel);
+    form.appendChild(note); form.appendChild(frow);
+    let pending = null;
+    const write = async (next, text) => {
+      Array.from(c.querySelectorAll(".acts button")).forEach(x => x.disabled = true);
+      sync.className = "sync"; sync.textContent = "Saving…";
+      try{
+        await db.doc("findings/" + f._id).update(next === "open"
+          ? {status:"open", closed_at:null, closed_by:null, close_note:null}
+          : {status: next, closed_at: new Date().toISOString(), closed_by:"board", close_note: text});
+      }catch(e){
+        sync.className = "sync bad"; sync.textContent = "Not saved — " + dbErr(e);
+        if(e && e.code === "invalid_argument") canWrite = false;
+        Array.from(c.querySelectorAll(".acts button")).forEach(x => x.disabled = false);
+      }
+    };
+    save.addEventListener("click", () => {
+      const text = (note.value || "").trim();
+      if(pending === "dismissed" && !text){ sync.className = "sync bad"; sync.textContent = "Say why — the next session reads it."; return; }
+      write(pending, text);
+    });
+    cancel.addEventListener("click", () => { pending = null; form.style.display = "none"; sync.textContent = ""; });
+    const mk = (label, next) => {
+      const b = el("button","move",label);
+      b.addEventListener("click", () => {
+        if(next === "open"){ write("open"); return; }
+        pending = next; form.style.display = "";
+        note.placeholder = next === "dismissed"
+          ? "Why this is not a real finding — the next session reads this"
+          : "What resolved it (optional)";
+        note.focus();
+      });
+      acts.appendChild(b);
+    };
+    if(OPEN.has(status)){ mk("Resolved","resolved"); mk("Not a finding","dismissed"); }
+    else mk("Reopen","open");
+    acts.appendChild(sync);
+    acts.appendChild(form);
+    c.appendChild(acts);
+  }
+  return c;
+}
+
+function renderRuns(runs){
+  const host = $("runs"); host.innerHTML = "";
+  $("lcount").textContent = runs.length ? String(runs.length) : "";
+  if(!runs.length){
+    host.appendChild(el("div","empty","No sessions logged yet. Each planning and retro session adds one entry here."));
+    return;
+  }
+  for(const r of runs){
+    const st = str(r.status) || "complete";
+    const c = el("article", "run" + (st === "complete" ? "" : " " + st));
+    const top = el("div","top");
+    top.appendChild(el("b","", str(r.date).slice(0,10) + " · " + (str(r.session) || "session")));
+    const tg = el("div","tags"); tg.style.marginTop = "0";
+    if(r.mode) tg.appendChild(el("span","tag" + (r.mode === "live" ? " due" : ""), str(r.mode)));
+    tg.appendChild(el("span","tag" + (st === "complete" ? "" : " od"), st));
+    top.appendChild(tg);
+    c.appendChild(top);
+    if(r.summary) c.appendChild(el("div","", str(r.summary)));
+
+    const nums = el("div","nums");
+    const n = (label, v) => {
+      if(v === undefined || v === null || v === "") return;
+      const s = el("span"); s.appendChild(el("b","",str(v))); s.appendChild(document.createTextNode(" " + label));
+      nums.appendChild(s);
+    };
+    const src = r.sources || {};
+    if(src.found !== undefined) n(src.expected !== undefined ? "sources (expected " + src.expected + ")" : "sources", src.found);
+    n("created", r.created); n("skipped", r.skipped); n("edited", r.edited);
+    if(r.tags_proposed !== undefined) n("tags accepted of " + r.tags_proposed, r.tags_accepted);
+    n("new findings", r.findings_new); n("carried", r.findings_carried);
+    if(nums.childNodes.length) c.appendChild(nums);
+
+    const list = (label, items) => {
+      items = arr(items).map(str).filter(Boolean);
+      if(!items.length) return;
+      c.appendChild(el("div","lbl",label));
+      const ul = el("ul"); for(const i of items) ul.appendChild(el("li","",i)); c.appendChild(ul);
+    };
+    list("Meetings with no notes source", src.unmatched_meetings);
+    list("Could not be done", r.could_not);
+    const clean = arr(r.checks_clean).map(str).filter(Boolean);
+    if(clean.length){ c.appendChild(el("div","lbl","Ran clean")); c.appendChild(el("div","sync",clean.join(" · "))); }
+    // A run that recorded no coverage list, no skip count or no could-not list is
+    // incomplete by SKILL.md's own definition; say so rather than looking tidy.
+    const missing = [];
+    if(!Array.isArray(src.unmatched_meetings)) missing.push("coverage list");
+    if(r.skipped === undefined) missing.push("skip count");
+    if(!Array.isArray(r.could_not)) missing.push("could-not list");
+    if(missing.length) c.appendChild(el("div","sync bad","Not recorded: " + missing.join(", ")));
+    host.appendChild(c);
+  }
+}
+
+let canWrite = null;
+function watchRecords(){
+  if(!db){
+    $("fstatus").textContent = $("lstatus").textContent = "Database not available in this view.";
+    renderFindings(); renderRuns([]);
+    return;
+  }
+  db.collection("findings").onSnapshot(snap => {
+    findings = snap.docs.map(d => Object.assign({_id: d.id}, d.data() || {}));
+    $("fstatus").textContent = snap.metadata.fromCache ? "Refreshing…" : "";
+    renderFindings();
+  }, e => { $("fstatus").className = "sync bad"; $("fstatus").textContent = dbErr(e); });
+  db.collection("runs").orderBy("date","desc").limit(52).onSnapshot(snap => {
+    $("lstatus").textContent = snap.metadata.fromCache ? "Refreshing…" : "";
+    renderRuns(snap.docs.map(d => d.data() || {}));
+  }, e => { $("lstatus").className = "sync bad"; $("lstatus").textContent = dbErr(e); });
+}
+
 /* ---------- local note drafts ---------- */
 async function saveDrafts(){
   if(!db) return;
@@ -587,10 +837,21 @@ async function saveDrafts(){
   $("hdr").textContent = DAYNAME[1] + " " + mon.getDate() + " — " + DAYNAME[5] + " " + fri.getDate() +
     " " + mon.toLocaleString(undefined,{month:"short"});
 
+  try{ showTab(localStorage.getItem("ursula.tab") || "week"); }catch(e){ showTab("week"); }
+
   try{
     db = await claude.use("db");
-    if(db){ const s = await db.doc("ursula/drafts").get(); if(s && s.data && s.data.drafts) drafts = s.data.drafts; }
+    if(db){
+      const s = await db.doc("ursula/drafts").get();
+      const d = s && s.exists ? s.data() : null;
+      if(d && d.drafts) drafts = Object.assign({}, d.drafts);
+    }
   }catch(e){}
+  try{
+    const u = await claude.use("user");
+    if(u) canWrite = await u.can("data.write");
+  }catch(e){}
+  watchRecords();
 
   mcp = await claude.use("mcp");
   if(!mcp){ setStatus("No connector access — this page can't reach Jira or Calendar from here.", true); return; }

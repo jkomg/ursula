@@ -15,8 +15,8 @@ Reads everything real. Writes nothing. Emits a changeset: every ticket it would
 create with full body, every field it would change with before and after, every
 comment it would post, every tag it would propose.
 
-This is the honest end-to-end test. It exercises mining, reconciliation, all nine
-checks and the routing decisions against your actual boards, and the only thing
+This is the honest end-to-end test. It exercises mining, reconciliation, every
+enabled check and the routing decisions against your actual boards, and the only thing
 missing is the mutation. A sandbox Jira project cannot test routing, because the
 routing decision *is* which real project a thing belongs in.
 
@@ -43,8 +43,15 @@ touch them:
 
 - **Never send email.** Gmail send, reply and forward are loadable. Read-only.
 - **Never post to Slack.** Read-only.
-- **Never modify or decline calendar events.** Flag collisions; the operator decides.
-- **Never write to a watched board.** Findings go to the shared manager board.
+- **Never edit, move, archive, delete or comment on a Confluence page.** Read-only.
+  Changes to pages become tickets in the cleanup backlog (`reference/packs/content-cleanup.md`).
+- **Calendar writes only under the tiered approval in `SKILL.md`**, and never in
+  `dry-run`. Earlier versions of this page said never; that was superseded when the
+  tiers were added, because a planning session that finds three collisions and can fix
+  none of them is doing half a job.
+- **No unsolicited writes to a watched board.** Findings go to the shared manager board.
+  A direct instruction from the operator — an update they promised someone — overrides
+  this (`test/golden-week.md`, defect 3).
 
 These are in `config/run.prohibitions` so they survive a config export.
 

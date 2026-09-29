@@ -26,12 +26,16 @@ Read `config/run.mode` before doing anything that writes.
   For proving write mechanics.
 - **`live`** — normal.
 
-State the active mode at the top of every session. An operator who thinks they are
+State the active mode at the top of every session, with the skill version from the
+`VERSION` file bundled with this skill (`bin/install.sh` writes it; "unknown" if the file is
+absent — an unbuilt copy). The version is how the operator knows which upload they are
+testing. An operator who thinks they are
 in dry-run and is not will find out the expensive way.
 
 **Prohibitions, in every mode.** The gateway exposes write tools well beyond Jira.
-**Never send email. Never post, draft or react in Slack.** Those put words in the
-operator's mouth to other people, and nothing this skill does requires it.
+**Never send email. Never post, draft or react in Slack. Never edit, move, archive,
+delete or comment on a Confluence page.** Those put words in the operator's mouth to
+other people, and nothing this skill does requires it.
 
 **Calendar writes are allowed, under approval, in tiers.** Blocking time is not the
 same act as sending a message, and a planning session that finds three collisions and
@@ -118,9 +122,18 @@ Read all configured boards, not just the owned ones:
 
 ### Pass 3 — analyse
 
-The nine checks are in `reference/analysis-checks.md`. Run all of them. Report the
-ones that fire, and say explicitly when a check found nothing rather than silently
-omitting it.
+Read the `findings` collection first. Findings the operator closed from the board since
+the last run are decisions: a `dismissed` finding is not raised again unless its
+evidence changed, and its `close_note` says why the check was wrong.
+
+The core checks are in `reference/analysis-checks.md`; each pack listed in
+`config/packs.enabled` adds its own from `reference/packs/<pack>.md`. Run the core set
+and every enabled pack. Report the ones that fire, and say explicitly, by slug, when a
+check found nothing rather than silently omitting it.
+
+A pack can also add to Pass 1 and Pass 2 — the `content-cleanup` pack reads Confluence
+spaces and reconciles pages against a backlog by page id. Read each enabled pack before
+Pass 1, not at Pass 3, or its mining happens too late to feed the checks.
 
 ### Pass 4 — the tagging sweep
 
@@ -152,8 +165,10 @@ forward. Restating it is a full-set operation and drops anything not repeated,
 which leaves the page rendering normally and unable to reach Jira. The baseline
 copy is in `artifact/index.html`.
 
-Write the run log, the new watermark and the ingested map to the database. Advance
-the watermark only on a fully successful run.
+Write the run log (`runs/<date>-<session>`), each finding (`findings/<key>`), the new
+watermark and the ingested map to the database, in the shapes in `config/schema.md` —
+the board's Findings and Log tabs render exactly those fields. Advance the watermark
+only on a fully successful run.
 
 ## Thursday: retro and one-pager
 
@@ -214,7 +229,8 @@ own board.
 
 | File | Read it when |
 |---|---|
-| `reference/analysis-checks.md` | Every run. The nine checks, with worked examples. |
+| `reference/analysis-checks.md` | Every run. The core checks, with worked examples, and how packs work. |
+| `reference/packs/<pack>.md` | Every run, for each pack in `config/packs.enabled`, before Pass 1. |
 | `reference/mining.md` | Every run. Queries, naming patterns, untitled-meeting matching. |
 | `reference/jira-conventions.md` | Before any Jira write. Transition IDs, the label-replacement trap, response envelopes, result caps. |
 | `reference/artifact-board.md` | When updating or rebuilding the board. |
@@ -240,7 +256,7 @@ Every run ends with four things, and a run missing any of them is incomplete:
    coverage is almost always wrong.
 2. **The skip count** — how many candidates already had tickets. Near zero means
    reconciliation did not happen.
-3. **The findings** — from the nine checks, with evidence and a recommendation.
+3. **The findings** — from the core checks and enabled packs, with evidence and a recommendation.
    None is a red flag, not a clean bill of health; say which checks ran clean.
 4. **What could not be done** — unreachable boards, capped queries, unopenable
    documents, checks that could not run.

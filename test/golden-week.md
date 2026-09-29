@@ -5,7 +5,7 @@ outcomes are known, and the skill should reproduce them.
 
 ## How to run it
 
-1. `config/run.mode` = `dry-run`
+1. `config/run.mode` = `dry-run`, `config/packs.enabled` = `[service-delivery]`
 2. `state/watermark` = `2026-09-21T00:00:00Z`
 3. Empty `state/ingested` into a scratch copy — the real map would correctly skip
    everything and prove nothing
@@ -63,7 +63,9 @@ failure.
 **Skips** — exact match expected. A false create is the more expensive error; it
 erodes trust in the whole run.
 
-**Findings** — partial credit. Six of nine is a pass for a first run. Findings 2, 3
+**Findings** — partial credit. Six of nine is a pass for a first run. The fixture needs
+the `service-delivery` pack: without it, findings 3 and 6 cannot fire and the run fails
+by construction. Findings 2, 3
 and 6 are the ones that justify the skill; missing any of those three is a fail
 regardless of the rest.
 
@@ -163,3 +165,30 @@ Defect 10 supersedes much of defect 8's framing. Coverage is better than measure
 the sweep was looking in the wrong place first, not failing to reach the documents.
 Genuinely unreachable meetings remain: recurring syncs and ad-hoc calls with no
 attachment and no document anywhere.
+
+## 2026-09-29 — checks split into core and packs (no run)
+
+Not a run: a structural change, logged so the next run knows what moved.
+
+`analysis-checks.md` now holds seven core checks. Capability confusion and template
+propagation moved to `reference/packs/service-delivery.md`. A new
+`reference/packs/content-cleanup.md` adds five Confluence checks — `stale-page`,
+`orphan-page`, `duplicate-title`, `unowned-page`, `backlog-drift` — for an operator
+whose only project is a Confluence cleanup backlog.
+
+Check slugs replace the 1–9 numbering, because the slug is what goes into a finding key.
+
+All five content-cleanup checks are unproven, and the pack marks three connector facts
+*observe at setup*: which owner fields a page read returns, whether anything exposes
+inbound links, and whether page history is reachable. The first setup with the pack on
+must record what it saw here.
+
+## 2026-09-29 — board: findings and log tabs (no run)
+
+The board gained Findings and Log tabs, reading new `findings/<key>` and
+`runs/<date>-<session>` collections (`config/schema.md`). Rendering was checked locally
+against stub data only; the tabs have not been opened against a real database.
+
+| # | Defect | Fix |
+|---|---|---|
+| 13 | The board read saved note drafts as `snapshot.data.drafts`. `data` is a function in the db contract, so drafts were written on every keystroke and never read back — a reload lost them. | Call `data()` and check `exists`. Found reading the runtime type definitions, not in a run; confirm drafts survive a reload on first use. |

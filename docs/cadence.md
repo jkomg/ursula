@@ -12,7 +12,7 @@ working.
 | Pass 0 | Operator's fifteen minutes with handwritten notes. Claude asks, then waits. |
 | Pass 1 | Mine Drive, Gmail, Calendar since the watermark. |
 | Pass 2 | Reconcile against Jira. Half the candidates usually already exist. |
-| Pass 3 | Run the nine checks. |
+| Pass 3 | Run the core checks and every enabled pack. |
 | Pass 4 | Tagging sweep — Claude proposes, operator disposes. |
 | Pass 5 | Write back to Jira, update the board, update the database. |
 

@@ -18,7 +18,7 @@ reached the source of one ticket in six; the rest came from meetings that produc
 notes anywhere. It now tells you which meetings it couldn't find notes for and asks.
 Your own fifteen minutes with your own notes is the primary input, not a supplement.
 
-Nine defects found and fixed across three test runs so far. Expect more.
+Twelve defects found and fixed across five test runs so far. Expect more.
 
 ## Before you start
 
@@ -45,8 +45,10 @@ there, and the config, state and board all live in a claude.ai artifact that Cla
 Code cannot reach. Claude Code is the right place to *edit* this repo; it is not where
 the skill runs.
 
-1. Extract the tarball.
-2. Add the skill through the Skills menu in claude.ai.
+1. You were given `ursula-<version>.zip`. Do not unzip it.
+2. In claude.ai: Settings → Capabilities → Skills → upload the zip. If an older Ursula
+   is there, replace it rather than adding a second one — two copies of the skill
+   trigger unpredictably.
 3. Start a chat and say: **"set up Ursula"**.
 
 It reads `docs/setup.md` and interviews you. You don't edit any files, and you never
@@ -97,7 +99,7 @@ maintain. You open a chat and say what you want.
 It opens by asking you to spend fifteen minutes with your own notes and then waits —
 that pause is deliberate, and it is the most valuable input of the week. Then it sweeps
 Drive, Slack, Gmail and your calendar, matches everything against Jira, tells you which
-meetings it could not find notes for, runs the nine checks, and proposes a set of tags,
+meetings it could not find notes for, runs the analysis checks, and proposes a set of tags,
 dates and tickets. You approve or reject each one. In dry-run it stops there and shows
 you the list rather than acting.
 

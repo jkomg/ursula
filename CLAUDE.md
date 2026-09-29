@@ -39,7 +39,8 @@ That loop is slow, so **batch edits**. Do not iterate one line at a time.
 SKILL.md                    the procedure itself — read this first
 INSTALL.md                  what a new operator is handed
 reference/
-  analysis-checks.md        nine checks; the actual value of the skill
+  analysis-checks.md        core checks and how packs work; the actual value of the skill
+  packs/                    domain packs: service-delivery, content-cleanup
   mining.md                 where commitments are found and how
   jira-conventions.md       API traps, all learned by getting them wrong
   artifact-board.md         the board's structure and capabilities
@@ -55,6 +56,8 @@ test/
   golden-week.md            a hand-processed week + the defect log
 artifact/
   index.html                copy of the live board (see below)
+bin/
+  install.sh                checks the skill, builds the upload zip
 ```
 
 ## Principles that hold across changes
@@ -83,26 +86,26 @@ and Calendar at runtime. If you rewrite it, know that capability declaration is 
 full-set operation — publishing a partial set silently revokes the rest and leaves a
 page that renders fine and cannot reach Jira.
 
-**`bin/install.sh`** does not exist yet, deliberately. It was left out because the
-skills directory layout was unknown. Write it only when given the real paths.
+**`bin/install.sh`** checks the skill and builds the zip uploaded to claude.ai. It
+installs nothing locally, on purpose — see `docs/release.md`. Run `bin/install.sh
+--check` after a batch of edits; it catches references to files that do not exist.
 
 ## Current state
 
 Twelve defects found and fixed across five dry-runs; the log is in
-`test/golden-week.md`. Two operators are running it. Three of the nine checks —
-deadline inversion, capability confusion, template propagation — have never fired in a
-test and remain unproven.
+`test/golden-week.md`. Two operators are running it. Checks are split into seven core
+checks plus domain packs (`reference/packs/`). Three checks — `deadline-inversion`,
+`capability-confusion`, `template-propagation` — have never fired in a test, and all
+five `content-cleanup` checks are unproven.
 
 Queued work, in rough priority order:
 
-1. **Confluence reference pack** — page-level checks (staleness, orphans, duplicate
-   titles, pages with no owner) for an operator whose only project is a Confluence
-   cleanup backlog. Ursula currently reads Jira tickets *about* pages and never a page.
-2. **Split `analysis-checks.md`** into a core set every operator gets plus domain packs
-   (service delivery, content cleanup). This is what makes the skill adoptable beyond
-   its author.
-3. **Rebuild `artifact/index.html`** with tabs for findings and the run log.
-4. **`bin/install.sh`** once the layout is known.
+1. **First real run of `content-cleanup`** — written, not yet run. Setup checks C1–C5
+   in `docs/setup.md` must record the observed Confluence fields back into the pack.
+2. **First real open of the board's Findings and Log tabs** — written and checked
+   against stub data only. Needs a run that writes `findings/` and `runs/`.
+3. **Confirm the upload format** assumed by `bin/install.sh` (`docs/release.md`).
+4. **Watched boards tab** on the board — described, not built.
 
 ## Conventions
 

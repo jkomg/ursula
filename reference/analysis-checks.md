@@ -1,12 +1,57 @@
 # The analysis checks
 
-Run all nine every cadence. Report what fired; state plainly when a check ran clean.
+Every operator runs the **core set** below. On top of it, each operator enables the
+**domain packs** that match their work, listed in `config/packs.enabled`. Run the core
+set and every enabled pack, every cadence. Report what fired; state plainly when a check
+ran clean.
 
 Every example below is real, from the week this skill was written.
 
+## Why core plus packs
+
+The first version shipped nine checks as a single list, all drawn from one operator's
+service-delivery work. Two of them — capability confusion and template propagation —
+only make sense for someone onboarding people onto cloned boards and access grants. The
+second operator's only project is a Confluence cleanup backlog; for them those two checks
+could never fire, and the checks that *could* matter — stale pages, duplicate titles,
+pages nobody owns — did not exist, because Ursula read Jira tickets about pages and never
+read a page.
+
+So the checks split by who they apply to, not by how important they are:
+
+| Set | File | Applies to |
+|---|---|---|
+| Core | this file | Anyone with a Jira board, a calendar and a manager |
+| `service-delivery` | `reference/packs/service-delivery.md` | Onboarding hires, access grants, boards cloned from templates |
+| `content-cleanup` | `reference/packs/content-cleanup.md` | A Confluence cleanup backlog: stale, orphaned, duplicate and unowned pages |
+
+A pack is not optional polish. An operator whose work matches a pack and does not enable
+it gets a run that looks complete and misses the findings that justify the skill.
+
+**Check ids are stable.** Each check has a slug (`deadline-inversion`,
+`stale-page`, …). The slug is what goes into a finding key
+(`<person>-<check>-<week>`) and into `state/findings`, so renaming one breaks the
+duplicate-card check between two operators and the new-versus-carried comparison between
+weeks. Add checks; do not rename them.
+
+## Core checks
+
+| Slug | Check | Proven in a test run |
+|---|---|---|
+| `deadline-inversion` | A dependency due after the thing that consumes it | Not yet |
+| `policy-conflict` | A proposal against the operator's written policy | Yes |
+| `scope-drift` | A title that understates the work by an order of magnitude | Yes |
+| `orphaned-commitment` | Said in a meeting, never became a ticket | Yes |
+| `self-blocking` | The operator is the blocker on someone else's board | Yes |
+| `stale-parent` | A parent so overdue its children's dates mean nothing | Yes |
+| `calendar-collision` | Double-bookings and meetings on top of better ones | Yes |
+
+"Not yet" means the check has never fired against real data. It is not evidence the
+check is wrong, and it is not evidence it works.
+
 ---
 
-## 1. Deadline inversion
+### `deadline-inversion`
 
 A dependency scheduled after the thing that consumes it.
 
@@ -22,7 +67,7 @@ a fixed date.
 
 ---
 
-## 2. Policy conflict
+### `policy-conflict`
 
 A proposal that contradicts the operator's own written policy.
 
@@ -37,23 +82,7 @@ Do not resolve these. Raise them as decisions with a recommendation.
 
 ---
 
-## 3. Capability confusion
-
-Someone believes an access grant does something it does not.
-
-Read the actual description of an access ticket rather than its title. Grants that
-sound equivalent usually are not.
-
-> "I have access, I can get in through the proxy" — but the open items were a
-> break-glass key and a vault decryption key. The proxy is the everyday path.
-> Break-glass exists precisely for when the everyday path is the broken thing, and
-> without the vault key the tooling cannot reach the fleet at all.
-
-Especially important when the work depends on deliberately breaking something.
-
----
-
-## 4. Scope drift
+### `scope-drift`
 
 A ticket's title understates its actual size by an order of magnitude.
 
@@ -63,26 +92,12 @@ Compare ticket titles against what source documents say the work involves.
 > requiring a human operator run before automation could be trusted. Unsized,
 > unowned, and sitting inside a five-week handover window.
 
-Trigger on vague verbs — walk, review, look at, align, understand — attached to
-things that might be large.
+Trigger on vague verbs — walk, review, look at, align, understand, clean up — attached
+to things that might be large.
 
 ---
 
-## 5. Template propagation
-
-A fix applied to live instances while the source stays broken.
-
-Whenever a correction touches anything cloned from a template, search the excluded
-template projects for the same item. Excluded means not scanned for work — it does
-not mean invisible.
-
-> Three per-person onboarding boards had a card with a bad training link. Fixing
-> those three leaves two template boards untouched, so the next hire inherits the
-> same bad link on day one.
-
----
-
-## 6. Orphaned commitments
+### `orphaned-commitment`
 
 Said in a meeting, never became a ticket.
 
@@ -96,7 +111,7 @@ and on whom."
 
 ---
 
-## 7. Self-blocking
+### `self-blocking`
 
 The operator is the blocker on someone else's board.
 
@@ -107,9 +122,13 @@ the operator's own board, which is exactly why they rot.
 > Unanswered comments and unmade introductions across three onboarding boards all
 > traced back to one queue.
 
+An operator with no watched boards still runs this check against Slack mentions and
+mail threads awaiting their reply (`reference/mining.md`). "No watched boards" is not
+"nothing to check".
+
 ---
 
-## 8. Stale parents
+### `stale-parent`
 
 A parent item so overdue it makes its children's dates meaningless.
 
@@ -123,7 +142,7 @@ Resolution is binary: close the parent, or give it an honest new date.
 
 ---
 
-## 9. Calendar collisions
+### `calendar-collision`
 
 Double-bookings, and meetings sitting on top of higher-value ones.
 
@@ -137,10 +156,31 @@ calendar.
 
 ---
 
+## Writing a new pack
+
+A pack is one file in `reference/packs/`. It must state:
+
+1. **Who it is for** — the kind of work that makes it apply, in one paragraph.
+2. **Config it needs** — fields under `config/packs.<pack>`, each asked in the setup
+   interview and each verified by execution in the completion contract
+   (`docs/setup.md`).
+3. **Which passes it adds to** — usually Pass 1 (what else to read) and Pass 2 (what to
+   reconcile against).
+4. **Its checks** — each with a stable slug, a definition, a worked example, and what
+   the operator should do when it fires.
+5. **Its prohibitions** — any writes the pack's connectors make possible and the skill
+   must never do.
+
+Mark every check in a new pack "not yet proven" until it has fired against real data,
+and log the run that proved it in `test/golden-week.md`.
+
 ## Reporting
 
-Lead with what fired, ordered by consequence, not by check number. Each finding gets
+Lead with what fired, ordered by consequence, not by check or pack. Each finding gets
 the evidence, the consequence, and a recommendation.
 
-State when checks ran clean. "Nothing self-blocking this week" is information, and
-its absence makes the operator wonder whether the check ran at all.
+State when checks ran clean, by slug, including the pack checks. "Nothing
+self-blocking this week" is information, and its absence makes the operator wonder
+whether the check ran at all. A check that could not run — a space unreachable, a field
+the connector does not return — goes under *what could not be done*, never under
+*clean*.
