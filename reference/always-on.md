@@ -28,20 +28,26 @@ Monday and Thursday, where the operator is present to decide.
 
 ### 1. What the operator told me
 
-Read the operator's Slack DM with themselves (`config/checkins.slack_dm`) since
-`state/checkin.slack_last_ts`. **Read the whole DM, not a thread**: operators reply in
-the channel, not in threads, and a thread-only read missed both replies in the spike.
-No prefix is required.
+Read the board's `notes` collection for documents with `status: "new"`. The operator
+writes them from the **Tell Ursula** box on the board's Outbox tab, in claude.ai, where
+they already are; they are the one input a check-in has that no tool can mine — the
+handwritten-notes pass from Monday's Pass 0, arriving continuously instead of once a
+week. Sort each note into:
 
-Ursula's own messages carry the connector's "Sent using Claude" attribution; skip
-those. Everything else is the operator speaking, and it is the one input a check-in has
-that no tool can mine — the handwritten-notes pass from Monday's Pass 0, arriving
-continuously instead of once a week. Sort each message into:
-
-- **A note or a to-do** — a candidate, carrying the message ts as its source
-- **A question** — answer it in the DM, briefly, from state and live reads
+- **A note or a to-do** — a candidate, carrying the note id as its source
+- **A question** — answer it, briefly, from state and live reads
 - **A request to do something** — a proposal in the outbox, never an action taken
-  directly from the message
+  directly from the note
+
+Then write back to the same note: `status: "read"`, and `reply` with one or two
+sentences saying what Ursula did with it ("Added as a candidate; matches NOM-12, so no
+new ticket", "Proposed a reply to Vandit — it is in the outbox"), plus `replied_at`
+from the clock. The reply is how the operator knows they were heard.
+
+If `config/checkins.slack_dm` is set, the operator's Slack DM with themselves is a
+second place to leave notes: read it since `state/checkin.slack_last_ts`, whole DM,
+not a thread, skipping messages carrying the connector's "Sent using Claude"
+attribution. Answers still go on the board, not in Slack.
 
 ### 2. What arrived
 
@@ -68,9 +74,9 @@ as in `reference/analysis-checks.md`. The full set runs on Monday and Thursday.
 - Anything that should happen: an outbox item (`reference/outbox.md`) with the exact
   words, the reason and the source. In `dry-run` the item is written with
   `mode: dry-run` and cannot send.
-- Monday morning's first check-in also posts the Pass 0 question to the DM: "Anything
-  from your notebook this week? Reply here any time." The answer arrives in pass 1 of
-  whichever check-in comes next.
+- Monday morning's first check-in asks the Pass 0 question in its final line, at every
+  level: "Anything from your notebook this week? Tell Ursula on the board." The answer
+  arrives as notes, read by whichever check-in comes next.
 
 ### 5. Heads-up
 

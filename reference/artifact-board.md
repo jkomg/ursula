@@ -42,7 +42,9 @@ Three tabs. The selected tab is remembered per browser.
   viewer's own connector and writes the receipt; the text can be edited before sending,
   and the original is kept. Dry-run items get Right / Wrong instead of Approve. The top
   of the tab is the heads-up control — Quiet, Daily, Chatty and the two channels — which
-  writes `config/voice`, the one config document the board changes.
+  writes `config/voice`, the one config document the board changes. Under it, **Tell
+  Ursula**: the operator writes a note (`notes`), and the next check-in or session
+  answers on it. This is the conversation channel; nothing goes through Slack.
 - **Findings** — the `findings` collection, open ones ordered by `rank`, closed ones
   folded underneath. Each shows evidence, consequence, recommendation and links. The
   operator can mark one resolved or not a finding (with a reason); that writes back to

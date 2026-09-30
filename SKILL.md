@@ -240,9 +240,9 @@ that should happen in the outbox. It tells the operator only as much as
 the one-pager and never advances `state/watermark`; those belong to Monday and
 Thursday. The procedure is `reference/always-on.md`; read it before a check-in.
 
-When the operator has check-ins on, Monday's Pass 0 question has usually been asked
-already in their DM, and their answers are candidates waiting in the outbox or in
-state. Read those before asking again.
+The operator talks to Ursula between sessions through the **Tell Ursula** box on the
+board (`notes`). At every session, read notes still `new` before Pass 0, and answer
+each one on the note, as a check-in would.
 
 ## Any day: hire scan
 

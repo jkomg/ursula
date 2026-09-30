@@ -161,6 +161,12 @@
   textarea.obody{width:100%;border:1px solid var(--line);color:var(--ink);font:inherit;font-size:13.5px;resize:vertical;min-height:90px}
   .obx .rcpt{font-size:12px;color:var(--dim);margin-top:6px;overflow-wrap:anywhere}
   .obx .acts{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);align-items:center}
+  .nt{border-top:1px solid var(--line);padding:9px 0 2px;font-size:13.5px}
+  .nt:first-child{border-top:0}
+  .nt .me{white-space:pre-wrap;overflow-wrap:anywhere}
+  .nt .u{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:5px;padding-left:10px;border-left:2px solid var(--accent);color:var(--ink)}
+  .nt .meta{font-size:11.5px;color:var(--dim);margin-top:3px}
+  #notes{margin-top:10px}
   .run.checkin{padding:7px 14px;font-size:13px}
   footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px}
   @media(max-width:600px){ .top{flex-wrap:wrap} .st{order:3} .day{flex-wrap:wrap} .day b{flex-basis:100%}
@@ -231,6 +237,13 @@
     <p class="vhelp" id="vhelp"></p>
     <div class="voice" id="vchan"></div>
     <div class="sync" id="vstatus"></div>
+  </div>
+  <div class="panel" style="padding:12px 14px">
+    <div class="eyebrow">Tell Ursula</div>
+    <p class="vhelp">A to-do, a note from your notebook, a question. The next check-in picks it up and answers here.</p>
+    <textarea class="note" id="tell" rows="2" placeholder="e.g. Promised Vandit feedback on his runbook by Friday"></textarea>
+    <div class="row"><button class="push" id="tellsend">Send to Ursula</button><span class="sync" id="tellstatus"></span></div>
+    <div id="notes"></div>
   </div>
   <div id="obanner"></div>
   <div id="ostatus" class="sync" style="margin-top:14px"></div>
@@ -1287,9 +1300,40 @@ async function saveVoice(patch){
     $("vstatus").className = "sync ok"; $("vstatus").textContent = "Saved. The next check-in uses it.";
   }catch(e){ $("vstatus").className = "sync bad"; $("vstatus").textContent = "Not saved — " + dbErr(e); }
 }
+/* ---------- notes to Ursula ----------
+   The operator's side of the conversation. Check-ins and sessions read `notes`
+   with status "new", act, and write `reply` (reference/always-on.md, pass 1). */
+let notes = [];
+function renderNotes(){
+  const host = $("notes"); host.innerHTML = "";
+  for(const n of notes.slice(0, 12)){
+    const d = el("div","nt");
+    d.appendChild(el("div","me", str(n.text)));
+    if(n.reply) d.appendChild(el("div","u", str(n.reply)));
+    const when = str(n.at).slice(0,16).replace("T"," ");
+    d.appendChild(el("div","meta", when + " · " + (n.status === "new" ? "waiting for the next check-in" : n.reply ? "answered " + str(n.replied_at).slice(0,16).replace("T"," ") : "read")));
+    host.appendChild(d);
+  }
+}
+async function sendNote(){
+  const t = ($("tell").value || "").trim();
+  if(!t || !db) return;
+  $("tellsend").disabled = true; $("tellstatus").className = "sync"; $("tellstatus").textContent = "Sending…";
+  try{
+    await db.collection("notes").doc("board-" + Date.now()).set({text: t, from: viewerId, at: nowIso(), status: "new"});
+    $("tell").value = ""; $("tellstatus").className = "sync ok"; $("tellstatus").textContent = "Sent. The next check-in answers here.";
+  }catch(e){ $("tellstatus").className = "sync bad"; $("tellstatus").textContent = "Not sent — " + dbErr(e); }
+  $("tellsend").disabled = false;
+}
+
 function watchOutbox(){
   if(!db){ $("ostatus").textContent = "Database not available in this view."; renderOutbox(); renderVoice(); return; }
   db.doc("config/run").onSnapshot(s => { runMode = s.exists ? str((s.data() || {}).mode) || "dry-run" : "dry-run"; renderOutbox(); }, () => {});
+  $("tellsend").addEventListener("click", sendNote);
+  db.collection("notes").orderBy("at","desc").limit(30).onSnapshot(snap => {
+    notes = snap.docs.map(d => Object.assign({_id: d.id}, d.data() || {}));
+    renderNotes();
+  }, () => {});
   db.doc("config/voice").onSnapshot(s => { voice = s.exists ? s.data() : null; renderVoice(); }, () => {});
   db.collection("outbox").orderBy("proposed_at","desc").limit(200).onSnapshot(snap => {
     outbox = snap.docs.map(d => Object.assign({_id: d.id}, d.data() || {}));

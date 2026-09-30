@@ -96,6 +96,18 @@ Operational, not configuration. Same database, `state` collection.
 | `state/tagging` | Proposals and whether the operator accepted them. |
 | `state/checkin` | `watermark` (the check-ins' own, never the cadence's) and `slack_last_ts` (newest operator DM message read). Advanced only by a completed check-in. |
 
+### `notes/<id>`
+
+The operator's side of the conversation, written from the board's **Tell Ursula** box.
+
+| Field | Written by | Notes |
+|---|---|---|
+| `text` | board | What the operator wrote |
+| `from`, `at` | board | Opaque viewer id; ISO time |
+| `status` | both | `new` → `read` |
+| `reply`, `replied_at` | session | One or two sentences: what Ursula did with it |
+| `refs` | session | Optional `[{label, url}]`: the ticket, outbox item or finding it became |
+
 ### `outbox/<id>`
 
 Every proposed action another person will read, and every calendar change, with its
