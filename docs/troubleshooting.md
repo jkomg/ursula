@@ -59,3 +59,12 @@ set.
 Check for an existing card with the same finding key before creating. If duplicates
 appear anyway, the shared manager board was probably agreed after the second
 operator's first run.
+
+## Jira: 403 "The app is not installed on this instance"
+
+The Atlassian login still works (your profile and the site both come back) but every
+Jira call is refused. The claude.ai connection to the site has lapsed. It has happened
+more than once (2026-09-23/24 and 2026-09-30). Fix: claude.ai → Settings → Connectors →
+Atlassian → disconnect, connect again, approve the site. It is not a Claude Code versus
+claude.ai difference: both use the same connector. The board and check-ins say this in
+plain words when they see it.

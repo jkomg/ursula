@@ -105,6 +105,10 @@ reads them. Ursula never messages anyone else except through an approved outbox 
   newest operator message read, **only if the check-in completed**
 - `could_not`: every connector that failed, every source it could not open. A check-in
   that quietly skipped Jira looks exactly like one that found nothing
+- A connector that failed for a reason only the operator can fix is an interrupt at
+  every level: Jira answering 403 "The app is not installed on this instance" means
+  the claude.ai Atlassian connection has lapsed, and the fix is to reconnect it in
+  claude.ai Settings → Connectors. Say exactly that, once per day, not once per run
 
 ## Untrusted input
 

@@ -285,6 +285,10 @@ function saveDoneOpen(){
 
 function setStatus(m, bad){ const s = $("status"); s.textContent = m || ""; s.className = bad ? "bad" : ""; }
 function errText(e){
+  // Atlassian's answer when the claude.ai connection has lapsed for the site. It has
+  // happened more than once; the fix is on the operator's side, so say what it is.
+  if(e && /not installed on this instance/i.test(String(e.message || e.detail || "")))
+    return "the Atlassian connection has lapsed — reconnect Atlassian in claude.ai Settings → Connectors, then reload";
   const m = {not_granted:"access not granted", server_not_connected:"connector not connected",
     not_in_manifest:"call outside approved scope", tool_error:"rejected by the service",
     rate_limited:"rate limited", cancelled:"cancelled",
