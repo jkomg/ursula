@@ -273,3 +273,8 @@ operator, and propose → approve on the board → Gmail send with the receipt k
 - **Slack DM does not notify.** The connector posts as the operator, so their own DM
   raises no alert. Fix: the DM is the record and reply channel; the interrupt is email
   to the operator's own address. Not yet confirmed that email alerts.
+- **Superseded the same day:** the interrupt is now the routine's own notification
+  ("Notify me when this routine finishes": push and email from Claude). The check-in's
+  final line is the notification. Email-to-self and the Slack DM log are optional and
+  need the guard settings on the routine's environment; without them every connector
+  write is blocked, confirmed on the first check-in (`guard: active`, cloud: true).

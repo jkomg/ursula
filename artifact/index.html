@@ -1275,21 +1275,15 @@ function renderVoice(){
     host.appendChild(b);
   }
   $("vhelp").textContent = (LEVELS.find(l => l[0] === cur) || LEVELS[0])[2];
-  const ch = (voice && voice.channels) || {slack_dm: true, email_self: true};
   const vc = $("vchan"); vc.innerHTML = "";
-  for(const [k, label] of [["email_self","Email me when something needs my OK"],["slack_dm","Keep a running note in my Slack DM"]]){
-    const lb = el("label"); const cb = document.createElement("input"); cb.type = "checkbox"; cb.id = "vc-" + k;
-    cb.checked = ch[k] !== false; cb.disabled = !db || canWrite === false;
-    cb.addEventListener("change", () => saveVoice({channels: Object.assign({}, ch, {[k]: cb.checked})}));
-    lb.appendChild(cb); lb.appendChild(document.createTextNode(label)); vc.appendChild(lb);
-  }
+  vc.appendChild(el("span","sync","Ursula reaches you through the check-in routine's own notification, sent by Claude to your phone and inbox. Turn it on in the routine's Notifications tab."));
 }
 async function saveVoice(patch){
   $("vstatus").className = "sync"; $("vstatus").textContent = "Saving…";
   try{
     const ref = db.doc("config/voice");
     const next = Object.assign({updated_at: nowIso(), updated_by: viewerId}, patch);
-    if(voice) await ref.update(next); else await ref.set(Object.assign({level:"quiet", channels:{slack_dm:true, email_self:true}}, next));
+    if(voice) await ref.update(next); else await ref.set(Object.assign({level:"quiet", channels:{slack_dm:false}}, next));
     $("vstatus").className = "sync ok"; $("vstatus").textContent = "Saved. The next check-in uses it.";
   }catch(e){ $("vstatus").className = "sync bad"; $("vstatus").textContent = "Not saved — " + dbErr(e); }
 }

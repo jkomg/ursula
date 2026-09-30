@@ -73,8 +73,7 @@ only sets the starting value. It is the one config document the board may change
 | Field | Notes |
 |---|---|
 | `level` | `quiet` (default) · `daily` · `chatty` |
-| `channels` | `{slack_dm: bool, email_self: bool}`. The board is always on. Defaults: both `true` |
-| `email` | The operator's own address, for email-to-self notices. The board also refuses to send a test to any other address |
+| `channels` | `{slack_dm: bool}`. Default `false`. A running log in the operator's own DM; works only when the routine's environment carries the guard settings. The interrupt is the routine's own notification, which needs no config |
 | `updated_at`, `updated_by` | Set by the board |
 
 ### `config/checkins`

@@ -115,8 +115,7 @@ An existing artifact URL to adopt, or permission to publish a new one.
 
 How much the operator wants to hear between sessions: `quiet` (only what needs them),
 `daily` (a morning and an end-of-day note) or `chatty` (everything, with reasons). Ask
-in those words, not as config. Record it in `config/voice` with their own email address
-and the channel id of their Slack DM with themselves. Tell them they can change it any
+in those words, not as config. Record it in `config/voice`. Tell them they can change it any
 time from the board. Then offer to turn on check-ins (`docs/routine.md`); say plainly
 that each check-in uses some of their Claude allowance.
 

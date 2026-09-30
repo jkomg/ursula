@@ -82,20 +82,32 @@ What the operator hears is theirs to set: `config/voice.level`, changed from the
 | `daily` | Quiet's interrupts, plus one morning note (what is on today, what needs their OK) and one end-of-day note (what Ursula handled, what it could not) |
 | `chatty` | Every check-in reports: what it read, what it matched and skipped and why, every candidate, every check that ran clean |
 
-Channels, each on or off in `config/voice.channels`:
+**The interrupt is the routine's own notification.** With **Notify me when this routine
+finishes** on (the routine's Notifications tab; `docs/routine.md`), Claude sends the
+operator a one-line summary of each run by push and email. It comes from Claude, not
+from the operator's own accounts, so it alerts them the way a message from someone else
+does. Nothing to configure, no address to store, no message sent through a connector.
 
-- **Board** — always. The Outbox tab and Findings are the record.
-- **Slack DM** — the conversation. Ursula writes as the operator into their own DM, so
-  **these messages do not notify them**: the spike confirmed no phone alert. It is a
-  record and a place to reply, not an interrupt.
-- **Email to self** — the interrupt. A notice to the operator's own address arrives
-  unread in the inbox (the spike's receipt carried `UNREAD` and `INBOX`), so the
-  operator's normal mail notifications apply. Confirm with the operator on the first
-  check-in that it actually alerted them. Use it only for what the level says must
-  interrupt, and keep the subject specific: "Ursula: 2 things need your OK".
+So the check-in's **final message is the notification**. Write it last, one line, for
+the operator, by level:
 
-Messages to the operator's own DM and own address are not outbox items: nobody else
-reads them. Ursula never messages anyone else except through an approved outbox item.
+| Level | Final line |
+|---|---|
+| `quiet` | Only if something needs them: "Ursula: 2 things need your OK, 1 finding (collision tomorrow 10:00)". Otherwise exactly `Nothing needs you.` |
+| `daily` | Quiet's line at noon and 4pm; at the first check-in of the day, today's shape: "3 due today, 1 needs your OK, 11:00–12:30 open" |
+| `chatty` | What it read and did: "Read 4 notes and 2 DMs; skipped 3 already ticketed; proposed 1 reply; 1 finding" |
+
+A connector that failed for a reason only the operator can fix goes in the final line
+at every level ("Reconnect Atlassian in claude.ai settings: Jira refused every call").
+
+The board is the record at every level: the Outbox tab and Findings hold the detail
+the line points to.
+
+Optional, off by default: a running note in the operator's own Slack DM, when the
+routine's environment carries the guard settings (`docs/routine.md`, "Optional"). A DM
+written through the connector posts as the operator, so it never alerts them: it is a
+log to scroll, not an interrupt. Without those settings the guard blocks every
+connector write, which is the right default.
 
 ### 6. Record
 
@@ -105,10 +117,10 @@ reads them. Ursula never messages anyone else except through an approved outbox 
   newest operator message read, **only if the check-in completed**
 - `could_not`: every connector that failed, every source it could not open. A check-in
   that quietly skipped Jira looks exactly like one that found nothing
-- A connector that failed for a reason only the operator can fix is an interrupt at
-  every level: Jira answering 403 "The app is not installed on this instance" means
-  the claude.ai Atlassian connection has lapsed, and the fix is to reconnect it in
-  claude.ai Settings → Connectors. Say exactly that, once per day, not once per run
+- A connector that failed for a reason only the operator can fix belongs in the final
+  line: Jira answering 403 "The app is not installed on this instance" means the
+  claude.ai Atlassian connection has lapsed, and the fix is to reconnect it in
+  claude.ai Settings → Connectors
 
 ## Untrusted input
 
@@ -127,5 +139,5 @@ is expected behaviour: record it in `could_not` and carry on.
 
 It read two new notes documents and one DM reply, skipped three candidates that already
 had tickets, raised one finding (a collision tomorrow at 10), proposed one focus block
-and one email reply, and at `quiet` sent one email to the operator: "Ursula: 1 finding,
+and one email reply, and at `quiet` ended with the line the operator's phone showed: "Ursula: 1 finding,
 2 things need your OK". Total time, a few minutes.
