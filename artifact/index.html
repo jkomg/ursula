@@ -35,6 +35,9 @@
     font-size:15px;line-height:1.5}
   .wrap{max-width:920px;margin:0 auto;padding:28px 18px 80px}
   header{border-bottom:2px solid var(--ink);padding-bottom:14px}
+  .brand{display:flex;gap:14px;align-items:center}
+  .brand > div{min-width:0}
+  .mark{width:52px;height:52px;flex:none}
   .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700}
   h1{font-size:clamp(24px,5vw,34px);margin:6px 0 4px;letter-spacing:-.02em;line-height:1.1}
   .sub{color:var(--dim);font-size:13.5px;margin:0}
@@ -167,9 +170,30 @@
 <body>
 <div class="wrap">
 <header>
+  <div class="brand">
+  <svg class="mark" viewBox="0 0 64 64" role="img" aria-label="Ursula">
+    <title>Ursula</title>
+    <g fill="none" stroke="var(--accent)" stroke-width="4.5" stroke-linecap="round">
+      <path d="M20 37c-4 8-9 10-12 6"/>
+      <path d="M26 39c-1 9-5 14-10 13"/>
+      <path d="M32 40c0 8-1 13 2 15 2 1.5 4 0 3.5-2"/>
+      <path d="M38 39c1 9 5 14 10 13"/>
+      <path d="M45 35c6-2 10-8 10-15"/>
+    </g>
+    <path d="M32 6C19 6 12 15 12 25c0 7 4 12 9 14h22c5-2 9-7 9-14C52 15 45 6 32 6Z" fill="var(--accent)"/>
+    <ellipse cx="25" cy="25" rx="4.6" ry="5.4" fill="#fffdf9"/>
+    <ellipse cx="39" cy="25" rx="4.6" ry="5.4" fill="#fffdf9"/>
+    <circle cx="26.6" cy="26.2" r="2.3" fill="#20211f"/>
+    <circle cx="40.6" cy="26.2" r="2.3" fill="#20211f"/>
+    <path d="M28 33c2.2 1.6 5.8 1.6 8 0" fill="none" stroke="#fffdf9" stroke-width="2" stroke-linecap="round"/>
+    <path d="M51 11l3 3.2 6-7.4" fill="none" stroke="var(--done)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <div>
   <div class="eyebrow">Ursula</div>
   <h1 id="hdr">This week</h1>
-  <p class="sub">Your open work and your actual week, read live. Status changes write back; notes post as comments when you send them. Findings and the log are what each session recorded.</p>
+  </div>
+  </div>
+  <p class="sub">Your open work and your actual week, read live. Status changes write back; notes post as comments when you send them. Anything that would reach someone else waits in the Outbox for your OK. Findings and the log are what each session recorded.</p>
 </header>
 
 <nav class="tabs" role="tablist">

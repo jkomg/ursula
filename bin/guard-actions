@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+"""PreToolUse hook for connector tools during a check-in.
+
+A check-in reads everything and writes almost nothing: its own state goes to the
+board through ArtifactData (not a connector), and anything for another person goes
+to the outbox for the operator to approve. So inside a check-in (URSULA_ROLE=checkin,
+set on the routine, not by the model), a connector tool is allowed only if it reads,
+or if it messages the operator alone:
+
+  slack_send_message   channel_id must be one of URSULA_SELF_SLACK (comma-separated)
+  gws_gmail_send       every recipient must be URSULA_SELF_EMAIL; no cc, bcc, from, attachments
+
+Everything else that is not a read is denied. Outside a check-in this hook does
+nothing: interactive sessions ask the operator in person.
+
+This is enforced here rather than in the prompt because a check-in reads mail, notes
+and tickets written by other people, and any of them can contain instructions.
+"""
+import json
+import os
+import re
+import sys
+
+if os.environ.get("URSULA_ROLE") != "checkin":
+    sys.exit(0)
+
+try:
+    event = json.load(sys.stdin)
+except ValueError:
+    sys.exit(0)
+
+name = event.get("tool_name", "")
+if not name.startswith("mcp__"):
+    sys.exit(0)
+tool = name.rsplit("__", 1)[-1]
+args = event.get("tool_input") or {}
+
+SELF_EMAIL = os.environ.get("URSULA_SELF_EMAIL", "").strip().lower()
+SELF_SLACK = {s.strip() for s in os.environ.get("URSULA_SELF_SLACK", "").split(",") if s.strip()}
+
+READ = re.compile(
+    r"(^|_)(get|list|search|read|fetch|query|lookup|agenda|freebusy|triage|download|export)(_|$)"
+    r"|^(get|search|lookup|fetch|atlassianuserinfo)"
+)
+
+
+def deny(reason):
+    print(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "Check-in guard: " + reason +
+            " Anything for another person goes to the outbox (reference/outbox.md).",
+    }}))
+    sys.exit(0)
+
+
+if tool == "slack_send_message":
+    if not SELF_SLACK:
+        deny("URSULA_SELF_SLACK is not set on this routine, so no Slack message may be sent.")
+    if str(args.get("channel_id", "")) not in SELF_SLACK:
+        deny("Slack messages may go only to the operator's own DM.")
+    sys.exit(0)
+
+if tool == "gws_gmail_send":
+    if not SELF_EMAIL:
+        deny("URSULA_SELF_EMAIL is not set on this routine, so no email may be sent.")
+    argv = [str(a) for a in (args.get("args") or [])]
+    banned = {"--cc", "--bcc", "--from", "-a", "--attach"}
+    if any(a in banned or a.split("=", 1)[0] in banned for a in argv):
+        deny("Email to self may not carry cc, bcc, a from alias or attachments.")
+    to = [argv[i + 1] for i, a in enumerate(argv[:-1]) if a == "--to"]
+    to += [a.split("=", 1)[1] for a in argv if a.startswith("--to=")]
+    rcpts = [r.strip().lower() for t in to for r in t.split(",") if r.strip()]
+    if not rcpts or any(r != SELF_EMAIL for r in rcpts):
+        deny("Email may go only to the operator's own address.")
+    sys.exit(0)
+
+if READ.search(tool.lower()):
+    sys.exit(0)
+
+deny(f"'{tool}' is not a read, and a check-in writes nothing through connectors.")

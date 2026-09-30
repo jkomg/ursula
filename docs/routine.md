@@ -22,7 +22,10 @@ from Claude Code (`/schedule`), or you can click through it at claude.ai/code/ro
 
 1. Open claude.ai/code/routines and choose **New routine**, or ask Claude in Claude Code
    to create it. Paste the prompt below, with your board's link where it says BOARD.
-2. Set the schedule and pick the connectors from the table.
+2. Set the schedule and pick the connectors from the table. Give the routine three
+   settings (they are not secrets): `URSULA_ROLE=checkin`, `URSULA_SELF_EMAIL=` your
+   address, and `URSULA_SELF_SLACK=` your Slack DM id and user id, comma-separated.
+   They switch on the guard that stops a check-in messaging anyone but you.
 3. Choose **Run now** once. Within a few minutes the board's Log tab shows a
    `checkin` entry. If it says a connector failed, fix that connector in claude.ai and
    run it again.
