@@ -22,14 +22,25 @@ from Claude Code (`/schedule`), or you can click through it at claude.ai/code/ro
 
 1. Open claude.ai/code/routines and choose **New routine**, or ask Claude in Claude Code
    to create it. Paste the prompt below, with your board's link where it says BOARD.
-2. Set the schedule and pick the connectors from the table. Give the routine three
-   settings (they are not secrets): `URSULA_ROLE=checkin`, `URSULA_SELF_EMAIL=` your
-   address, and `URSULA_SELF_SLACK=` your Slack DM id and user id, comma-separated.
-   They switch on the guard that stops a check-in messaging anyone but you.
-3. Choose **Run now** once. Within a few minutes the board's Log tab shows a
+2. Set the schedule and pick the connectors from the table.
+3. Give it an environment of its own. A routine cannot hold settings; its cloud
+   environment does. In the routine's environment picker choose **Add cloud
+   environment**, name it `Ursula`, and paste these three lines into **Environment
+   variables** (they are not secrets, so that box is the right place):
+
+   ```text
+   URSULA_ROLE=checkin
+   URSULA_SELF_EMAIL=you@example.com
+   URSULA_SELF_SLACK=D0XXXXXXX,U0XXXXXXX
+   ```
+
+   The last line is your Slack DM with yourself and your own user id; Claude can look
+   both up. They tell the guard (`bin/guard-actions`) who "you" is. Without them the
+   guard fails closed: the check-in still reads and proposes, but cannot message you.
+4. Choose **Run now** once. Within a few minutes the board's Log tab shows a
    `checkin` entry. If it says a connector failed, fix that connector in claude.ai and
    run it again.
-4. On the board, open the Outbox tab and set how chatty Ursula should be.
+5. On the board, open the Outbox tab and set how chatty Ursula should be.
 
 To pause check-ins, turn the routine off at claude.ai/code/routines. To delete it, do it
 there too.
