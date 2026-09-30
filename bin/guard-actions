@@ -10,8 +10,15 @@ or if it messages the operator alone:
   slack_send_message   channel_id must be one of URSULA_SELF_SLACK (comma-separated)
   gws_gmail_send       every recipient must be URSULA_SELF_EMAIL; no cc, bcc, from, attachments
 
-Everything else that is not a read is denied. Outside a check-in this hook does
-nothing: interactive sessions ask the operator in person.
+Everything else that is not a read is denied.
+
+When it applies: URSULA_ROLE=checkin, or URSULA_ROLE unset in a cloud session
+(CLAUDE_CODE_REMOTE set). A routine cannot carry its own variables, only its cloud
+environment can, so a check-in on an environment without them fails closed: reads
+work, and nothing is sent, not even to the operator. URSULA_ROLE=interactive turns it
+off. On a laptop it does nothing: interactive sessions ask the operator in person.
+
+  bin/guard-actions --status    prints whether the guard is active and what it allows
 
 This is enforced here rather than in the prompt because a check-in reads mail, notes
 and tickets written by other people, and any of them can contain instructions.
@@ -21,7 +28,18 @@ import os
 import re
 import sys
 
-if os.environ.get("URSULA_ROLE") != "checkin":
+ROLE = os.environ.get("URSULA_ROLE", "").strip()
+REMOTE = os.environ.get("CLAUDE_CODE_REMOTE", "").strip().lower() not in ("", "0", "false")
+ACTIVE = ROLE == "checkin" or (not ROLE and REMOTE)
+
+if sys.argv[1:] == ["--status"]:
+    self_email = bool(os.environ.get("URSULA_SELF_EMAIL", "").strip())
+    self_slack = bool(os.environ.get("URSULA_SELF_SLACK", "").strip())
+    print(json.dumps({"guard": "active" if ACTIVE else "off", "role": ROLE or None, "cloud": REMOTE,
+                      "email_to_self": ACTIVE and self_email, "slack_to_self": ACTIVE and self_slack}))
+    sys.exit(0)
+
+if not ACTIVE:
     sys.exit(0)
 
 try:
