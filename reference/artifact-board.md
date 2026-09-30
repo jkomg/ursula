@@ -1,5 +1,9 @@
 # The artifact board
 
+This is the Claude native live board. For ChatGPT/Codex or a portable copy from
+either host, use the snapshot in `reference/runtime.md` and
+`scripts/render_snapshot.py`. The snapshot has no live bridge or write buttons.
+
 A standing page, updated in place, week after week. Never a fresh artifact per
 cadence — the URL is something the operator bookmarks and returns to.
 
@@ -26,6 +30,13 @@ Three tabs. The selected tab is remembered per browser.
 - **This week** — tagged items read live from Jira, sorted by due date ascending then
   priority, and the calendar for the week with open time. Undated items sink to the
   bottom; that is correct.
+- **One tab per hire** — one for each document in `hires`, between This week and
+  Findings, appearing after the first scan of that person (`reference/hire-scan.md`).
+  The scan's judgement first — waiting on the operator, blocked, flagged, overdue,
+  moved, the one-to-one agenda, that hire's findings — then their board read live
+  from Jira, read-only, with the items the scan named marked. The live read uses the
+  same `searchJiraIssuesUsingJql` grant as This week, so the tab needs no new
+  capability.
 - **Findings** — the `findings` collection, open ones ordered by `rank`, closed ones
   folded underneath. Each shows evidence, consequence, recommendation and links. The
   operator can mark one resolved or not a finding (with a reason); that writes back to
@@ -39,8 +50,8 @@ Field shapes for both collections are in `config/schema.md`; change them there f
 then the page. Findings and Log read the database only — they work when Jira is
 unreachable, which is also when they are most useful.
 
-Not built yet: a **Watched boards** tab (blocked and review-flagged items from reports'
-boards). The Thursday sweep produces it in chat for now.
+Not built yet: a **Watched boards** tab across every report at once. Hire tabs cover one
+person at a time; the Thursday sweep still produces the all-boards view in chat.
 
 ## Publishing this version
 

@@ -127,6 +127,20 @@
   .run ul{margin:6px 0 0;padding-left:18px;font-size:13.5px}
   .run .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-top:9px}
   .run.partial{border-left:3px solid var(--should)} .run.failed{border-left:3px solid var(--err)}
+  .hsum{margin:14px 0 0;font-size:14.5px}
+  .hmeta{font-size:12px;color:var(--dim);margin-top:6px}
+  .hmeta.old{color:var(--should)}
+  .hnums{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .hnums span{border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--dim);background:var(--panel)}
+  .hnums b{display:block;font-size:18px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .hnums span.hot b{color:var(--must)}
+  .hitem{display:flex;gap:10px;align-items:baseline;padding:9px 14px;border-bottom:1px solid var(--line);font-size:13.5px}
+  .hitem:last-child{border-bottom:0}
+  .hitem .tag{flex:none}
+  .hitem .why{color:var(--dim);font-size:12.5px}
+  .hitem > div{min-width:0;overflow-wrap:anywhere}
+  .agenda{margin:0;padding:10px 14px 10px 32px;font-size:14px}
+  .agenda li{margin:3px 0}
   footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px}
   @media(max-width:600px){ .top{flex-wrap:wrap} .st{order:3} .day{flex-wrap:wrap} .day b{flex-basis:100%}
     .fnd dl{grid-template-columns:1fr} .fnd dt{padding-top:6px} }
@@ -142,6 +156,7 @@
 
 <nav class="tabs" role="tablist">
   <button role="tab" data-tab="week" aria-selected="true">This week</button>
+  <span id="hiretabs" style="display:contents"></span>
   <button role="tab" data-tab="findings" aria-selected="false">Findings<span class="n" id="fcount"></span></button>
   <button role="tab" data-tab="log" aria-selected="false">Log<span class="n" id="lcount"></span></button>
 </nav>
@@ -160,6 +175,10 @@
 </div>
 
 <div id="lanes"></div>
+</div>
+
+<div class="view" id="v-hire" hidden>
+  <div id="hire"></div>
 </div>
 
 <div class="view" id="v-findings" hidden>
@@ -617,15 +636,24 @@ function showDiagnostics(){
 
 /* ---------- tabs ---------- */
 const TABS = ["week","findings","log"];
+let currentTab = "week", wantedTab = "week";
 function showTab(t){
-  if(!TABS.includes(t)) t = "week";
+  wantedTab = t;
+  const hireSlug = /^hire:/.test(t) ? t.slice(5) : null;
+  if(hireSlug && !hires.some(h => h._id === hireSlug)) t = "week";   // not loaded yet, or gone
+  else if(!hireSlug && !TABS.includes(t)) t = "week";
+  currentTab = t;
   for(const b of document.querySelectorAll(".tabs button"))
     b.setAttribute("aria-selected", b.dataset.tab === t ? "true" : "false");
   for(const k of TABS) $("v-" + k).hidden = k !== t;
-  try{ localStorage.setItem("ursula.tab", t); }catch(e){}
+  $("v-hire").hidden = !hireSlug || t === "week";
+  if(hireSlug && t !== "week") renderHire(hireSlug);
+  try{ localStorage.setItem("ursula.tab", wantedTab); }catch(e){}
 }
-for(const b of document.querySelectorAll(".tabs button"))
-  b.addEventListener("click", () => showTab(b.dataset.tab));
+document.querySelector(".tabs").addEventListener("click", e => {
+  const b = e.target.closest("button[data-tab]");
+  if(b) showTab(b.dataset.tab);
+});
 
 /* ---------- findings and run log ----------
    Written by the Ursula session through ArtifactData, read here. Shapes are
@@ -817,11 +845,181 @@ function watchRecords(){
     findings = snap.docs.map(d => Object.assign({_id: d.id}, d.data() || {}));
     $("fstatus").textContent = snap.metadata.fromCache ? "Refreshing…" : "";
     renderFindings();
+    renderHireTabs();
+    if(/^hire:/.test(currentTab)) renderHire(currentTab.slice(5));
   }, e => { $("fstatus").className = "sync bad"; $("fstatus").textContent = dbErr(e); });
   db.collection("runs").orderBy("date","desc").limit(52).onSnapshot(snap => {
     $("lstatus").textContent = snap.metadata.fromCache ? "Refreshing…" : "";
     renderRuns(snap.docs.map(d => d.data() || {}));
   }, e => { $("lstatus").className = "sync bad"; $("lstatus").textContent = dbErr(e); });
+}
+
+/* ---------- hire tabs ----------
+   One tab per document in `hires`, written by a hire scan (SKILL.md, "Hire scan").
+   The scan is the judgement, as of when it ran; the live list under it reads the
+   hire's board from Jira now, read-only, so the two can be compared. */
+let hires = [];
+const liveCache = {};             // slug -> {at, rows, capped} | {err}
+const KEY_RE = /^[A-Z][A-Z0-9_]{1,19}$/;   // project keys only — this goes into JQL
+function renderHireTabs(){
+  const host = $("hiretabs"); host.innerHTML = "";
+  for(const h of hires){
+    const b = el("button");
+    b.setAttribute("role","tab"); b.dataset.tab = "hire:" + h._id;
+    b.setAttribute("aria-selected", currentTab === b.dataset.tab ? "true" : "false");
+    b.textContent = str(h.name) || h._id;
+    const open = findings.filter(f => f.subject === h._id && OPEN.has(str(f.status) || "open")).length;
+    const hot = arr(h.needs_me).length + arr(h.blocked).length;
+    if(hot || open) b.appendChild(el("span","n", String(hot || open)));
+    host.appendChild(b);
+  }
+  if(wantedTab !== currentTab) showTab(wantedTab);    // restore a remembered hire tab once it exists
+}
+function ageDays(iso){
+  const t = Date.parse(str(iso));
+  return isNaN(t) ? null : Math.floor((Date.now() - t) / 86400000);
+}
+function itemList(title, items, why){
+  items = arr(items).filter(Boolean);
+  if(!items.length) return null;
+  const pnl = el("div","panel");
+  const h = el("h3","",title); h.appendChild(el("b","", String(items.length))); pnl.appendChild(h);
+  for(const it of items){
+    const row = el("div","hitem");
+    const url = str(it.url);
+    if(it.key){
+      if(/^https:\/\//.test(url)){ const a = el("a","tag key", str(it.key)); a.href = url; a.target = "_blank"; a.rel = "noopener"; row.appendChild(a); }
+      else row.appendChild(el("span","tag key", str(it.key)));
+    }
+    const body = el("div");
+    body.appendChild(el("div","", str(it.title)));
+    const w = why(it);
+    if(w) body.appendChild(el("div","why", w));
+    row.appendChild(body);
+    pnl.appendChild(row);
+  }
+  return pnl;
+}
+function renderHire(slug){
+  const h = hires.find(x => x._id === slug);
+  const host = $("hire"); host.innerHTML = "";
+  if(!h){ host.appendChild(el("div","empty","No scan recorded for this person.")); return; }
+
+  host.appendChild(el("h2","", (str(h.name) || slug) + (h.board ? " · " + str(h.board) : "")));
+  if(h.summary) host.appendChild(el("p","hsum", str(h.summary)));
+  const age = ageDays(h.scanned_at);
+  const meta = el("div", "hmeta" + (age !== null && age > 7 ? " old" : ""),
+    "Scanned " + (age === null ? "at an unknown time" : age === 0 ? "today" : age + (age === 1 ? " day" : " days") + " ago") +
+    (h.mode ? " · " + str(h.mode) : "") +
+    (age !== null && age > 7 ? " · older than a week — ask Claude for a fresh scan" : ""));
+  host.appendChild(meta);
+
+  const c = h.counts || {};
+  const nums = el("div","hnums");
+  for(const [k,label,hot] of [["open","open"],["blocked","blocked",1],["needs_review","needs review",1],["overdue","overdue",1],["done_since_last","done since last scan"]]){
+    if(c[k] === undefined || c[k] === null) continue;
+    const s = el("span", hot && Number(c[k]) > 0 ? "hot" : ""); s.appendChild(el("b","",str(c[k]))); s.appendChild(document.createTextNode(label));
+    nums.appendChild(s);
+  }
+  if(nums.childNodes.length) host.appendChild(nums);
+
+  const lists = [
+    itemList("Waiting on you", h.needs_me, it => str(it.why)),
+    itemList("Blocked", h.blocked, it => [it.on_whom ? "on " + str(it.on_whom) : "", it.since ? "since " + str(it.since).slice(0,10) : ""].filter(Boolean).join(" · ")),
+    itemList("Flagged for review", h.needs_review, it => str(it.why)),
+    itemList("Overdue", h.overdue, it => it.due ? "due " + str(it.due).slice(0,10) : ""),
+    itemList("Moved since last scan", h.moved, it => str(it.change))
+  ];
+  for(const l of lists) if(l) host.appendChild(l);
+
+  const agenda = arr(h.agenda).map(str).filter(Boolean);
+  if(agenda.length){
+    const pnl = el("div","panel"); pnl.appendChild(el("h3","","For the one-to-one"));
+    const ol = el("ol","agenda"); for(const a of agenda) ol.appendChild(el("li","",a));
+    pnl.appendChild(ol); host.appendChild(pnl);
+  }
+
+  const mine = findings.filter(f => f.subject === slug && OPEN.has(str(f.status) || "open"));
+  if(mine.length){
+    host.appendChild(el("h2","","Findings"));
+    for(const f of mine) host.appendChild(findingCard(f));
+  }
+
+  const could = arr(h.could_not).map(str).filter(Boolean);
+  if(could.length){
+    const pnl = el("div","panel"); pnl.appendChild(el("h3","","Could not be done"));
+    const ul = el("ul","agenda"); for(const x of could) ul.appendChild(el("li","",x));
+    pnl.appendChild(ul); host.appendChild(pnl);
+  } else if(!Array.isArray(h.could_not)){
+    host.appendChild(el("div","sync bad","Not recorded: could-not list"));
+  }
+
+  const live = el("div"); host.appendChild(live);
+  renderLive(h, live);
+}
+async function renderLive(h, host){
+  const slug = h._id;
+  const key = str(h.board);
+  host.innerHTML = "";
+  const pnl = el("div","panel");
+  const head = el("h3","","Their board now");
+  const note = el("b","","");
+  head.appendChild(note); pnl.appendChild(head); host.appendChild(pnl);
+  if(!KEY_RE.test(key)){ note.textContent = "no board key on the scan"; return; }
+  if(!mcp){ note.textContent = "live view needs the Jira connector"; return; }
+  let r = liveCache[slug];
+  if(r && r.pending){ note.textContent = "reading " + key + "…"; return; }
+  if(!r){
+    note.textContent = "reading " + key + "…";
+    liveCache[slug] = {pending: true};
+    try{
+      if(!cloudId) cloudId = await resolveCloudId();
+      const p = unwrap(await call(CFG.JIRA, "searchJiraIssuesUsingJql", {
+        cloudId, maxResults: 100,
+        jql: "project = " + key + " AND statusCategory != Done ORDER BY duedate ASC, priority DESC",
+        fields: ["summary","status","priority","duedate","labels"]
+      }));
+      raiseIfServiceError(p);
+      const rows = listOf(p && p.issues) || listOf(p);
+      if(!rows) throw {code:"bad_shape"};
+      r = liveCache[slug] = {at: new Date(), rows: rows.filter(x => x && x.key && x.fields)};
+    }catch(e){
+      r = liveCache[slug] = {err: errText(e)};
+    }
+    // Re-render rather than finish here: the scan may have re-rendered meanwhile,
+    // and this host may no longer be on the page.
+    if(currentTab === "hire:" + slug) renderHire(slug);
+    return;
+  }
+  if(r.err){ note.textContent = "couldn't read " + key + ": " + r.err; return; }
+  // 100 back means the cap, not the total (reference/jira-conventions.md).
+  note.textContent = r.rows.length + (r.rows.length >= 100 ? "+ open — capped, not the total" : " open") + " · read " + hhmm(r.at);
+  const scannedKeys = new Set([].concat(arr(h.needs_me), arr(h.blocked), arr(h.needs_review), arr(h.overdue)).map(x => x && x.key));
+  const today = ymd(new Date());
+  for(const iss of r.rows){
+    const f = iss.fields;
+    const row = el("div","hitem");
+    const a = el("a","tag key", iss.key);
+    a.href = iss.webUrl || ((iss.self || "").split("/rest/")[0] + "/browse/" + iss.key); a.target = "_blank"; a.rel = "noopener";
+    row.appendChild(a);
+    const body = el("div");
+    body.appendChild(el("div","", str(f.summary)));
+    const bits = [str(f.status && f.status.name)];
+    if(f.duedate) bits.push((f.duedate < today ? "overdue " : "due ") + f.duedate);
+    if(arr(f.labels).includes("needs-review")) bits.push("needs-review");
+    if(scannedKeys.has(iss.key)) bits.push("in the scan");
+    body.appendChild(el("div","why", bits.filter(Boolean).join(" · ")));
+    row.appendChild(body);
+    pnl.appendChild(row);
+  }
+}
+function watchHires(){
+  if(!db) return;
+  db.collection("hires").orderBy("name").onSnapshot(snap => {
+    hires = snap.docs.map(d => Object.assign({_id: d.id}, d.data() || {}));
+    renderHireTabs();
+    if(/^hire:/.test(currentTab)) renderHire(currentTab.slice(5));
+  }, () => {});
 }
 
 /* ---------- local note drafts ---------- */
@@ -852,8 +1050,10 @@ async function saveDrafts(){
     if(u) canWrite = await u.can("data.write");
   }catch(e){}
   watchRecords();
+  watchHires();
 
   mcp = await claude.use("mcp");
+  if(mcp && /^hire:/.test(currentTab)) renderHire(currentTab.slice(5));
   if(!mcp){ setStatus("No connector access — this page can't reach Jira or Calendar from here.", true); return; }
 
   try{

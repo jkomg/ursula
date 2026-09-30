@@ -1,6 +1,6 @@
 # Ursula
 
-A weekly operating harness for a service-delivery manager.
+A weekly operating harness for a service-delivery manager, for Claude or ChatGPT/Codex.
 
 Ursula mines meeting notes, calendar and mail for commitments, reconciles them
 against Jira, hunts for contradictions across projects, and produces a one-pager for
@@ -10,7 +10,7 @@ the operator's own manager. Two sessions a week: plan and retro.
 value is catching that a dependency is scheduled after the thing that consumes it,
 that an access grant does not do what someone thinks it does, or that a fix applied
 to three tickets left two templates broken. A run that produces tidy tickets and no
-findings has done the easy half.
+findings has done the easy half, unless it shows per check what ran clean and why.
 
 ## Layout
 
@@ -26,6 +26,7 @@ reference/
   mining.md                   queries, naming patterns, untitled meetings
   jira-conventions.md         transition ids, label trap, response envelopes
   artifact-board.md           board structure and capabilities
+  hire-scan.md                one person's board, as its own tab on the board
 docs/
   setup.md                    the conversational install — start here
   cadence.md                  the weekly rhythm
@@ -37,17 +38,27 @@ config/
 
 ## Start
 
-**Handing this to someone? Run `bin/install.sh` and send the zip with `INSTALL.md`.**
+**Handing this to someone? Run `bin/install.sh --target all` and send the matching
+host zip with `INSTALL.md`.** Claude remains the default build target.
+
+ChatGPT/Codex installation and setup: `docs/chatgpt.md`. Both hosts use the same
+cadence and checks. Claude has a live artifact board; ChatGPT/Codex has a portable,
+dated snapshot and private state files or an explicit export. The Python 3 helper
+`scripts/render_snapshot.py` can produce that snapshot for either host.
+
+Write batches now carry per-action receipts for resuming partial runs, and mining
+uses a frozen window so notes arriving during write-back are picked up next time
+(`reference/run-recovery.md`).
 
 Read `docs/setup.md` for the full version. Setup is an interview, not a file edit — the operator answers
-questions and Claude writes the config. Nobody needs to touch YAML.
+questions and the assistant writes the config. Nobody needs to touch YAML.
 
 ## Three tiers of state
 
 | Tier | Holds | Why |
 |---|---|---|
 | Git | Skill and docs | Versioned, reviewable, propagates to the next operator |
-| Artifact database | Config, watermark, run log, tagging history | Per-operator, changes twice a week, no business in version control |
+| Private state store | Config, watermark, run log, tagging history | Claude artifact database or ChatGPT/Codex files/export; per-operator, outside version control |
 | Jira | Everything two people must agree on | Already the system of record. A second shared store immediately disagrees with the first. |
 
 ## Multiple operators

@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Build the Ursula skill bundle for upload to claude.ai.
+# Build Ursula skill bundles for Claude or ChatGPT/Codex.
 #
-# Ursula runs in claude.ai, not on this machine, so "install" means: check the skill
-# is well formed, stamp it with the commit it came from, and write one zip that is
-# uploaded through claude.ai's Skills menu and is also what gets handed to another
-# operator. Nothing is copied into a local skills directory; see docs/release.md.
+# "Install" means package, not configure: check the skill, stamp its version, and
+# write host-labelled zips. Nothing is copied into a local skills directory;
+# see docs/release.md and docs/chatgpt.md for the separate runtime setup.
 #
 #   bin/install.sh              build dist/ursula-<version>.zip
 #   bin/install.sh --check      run the checks only, write nothing
 #   bin/install.sh --out DIR    write the zip into DIR instead of dist/
+#   bin/install.sh --target openai  build the ChatGPT/Codex bundle
+#   bin/install.sh --target all     build both host bundles
 #
 # Exit status is non-zero if any check fails; no zip is written in that case.
 
@@ -18,19 +19,24 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NAME="ursula"
 OUT="$ROOT/dist"
 CHECK_ONLY=0
+TARGET=claude
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --check) CHECK_ONLY=1; shift ;;
-    --out)   OUT="$(cd "${2:?--out needs a directory}" && pwd)"; shift 2 ;;
+    --out)   OUT="${2:?--out needs a directory}"; shift 2 ;;
+    --target) TARGET="${2:?--target needs claude, openai or all}"; shift 2 ;;
     -h|--help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+case "$TARGET" in claude|openai|all) ;; *) echo "invalid target: $TARGET" >&2; exit 2 ;; esac
+# Resolve relative output paths against the caller, before changing into the repo.
+case "$OUT" in /*) ;; *) OUT="$PWD/$OUT" ;; esac
 
 # What ships. Everything the skill reads at run time, plus the operator's install
 # page. CLAUDE.md, bin/ and dist/ are for maintaining the repo and stay out.
-SHIP=(SKILL.md INSTALL.md README.md reference docs config artifact test)
+SHIP=(SKILL.md INSTALL.md README.md reference docs config artifact test scripts agents)
 
 cd "$ROOT"
 fail=0
@@ -63,7 +69,7 @@ missing=0
 while IFS= read -r ref; do
   case "$ref" in *'<'*|*'*'*) continue ;; esac
   [ -e "$ref" ] || { bad "referenced but missing: $ref"; missing=1; }
-done < <(grep -rhoE '`(reference|docs|config|artifact|test|bin)/[A-Za-z0-9_/<>*-]+\.(md|html|yaml|sh)`' \
+done < <(grep -rhoE '`(reference|docs|config|artifact|test|bin|scripts|agents)/[A-Za-z0-9_/<>*-]+\.(md|html|yaml|sh|py)`' \
            SKILL.md INSTALL.md README.md reference docs config test 2>/dev/null \
          | tr -d '`' | sed 's/[.,;:]$//' | sort -u)
 [ "$missing" -eq 0 ] && ok "every referenced path exists"
@@ -75,16 +81,18 @@ done < <(grep -oE '^\| `[a-z-]+` \| `reference/packs/' reference/analysis-checks
 ok "pack files present: $(ls reference/packs | sed 's/\.md$//' | tr '\n' ' ')"
 
 # 5. No secrets. config/schema.md forbids them anywhere shared, and a zip is shared.
-if grep -rnIE '(xox[abp]-[A-Za-z0-9-]+|ATATT[A-Za-z0-9_-]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|AKIA[0-9A-Z]{16})' "${SHIP[@]}" >/dev/null 2>&1; then
-  bad "something that looks like a token or private key is in the shipped files:"
-  grep -rnIE '(xox[abp]-[A-Za-z0-9-]+|ATATT[A-Za-z0-9_-]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|AKIA[0-9A-Z]{16})' "${SHIP[@]}" | cut -c1-120
+#    Report where, never what: the match itself must not end up in a terminal log.
+secret_hits="$(grep -rnIE '(xox[abp]-[A-Za-z0-9-]+|ATATT[A-Za-z0-9_-]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|AKIA[0-9A-Z]{16})' "${SHIP[@]}" 2>/dev/null | cut -d: -f1,2 || true)"
+if [ -n "$secret_hits" ]; then
+  bad "a token or private-key pattern is in the shipped files (value not shown):"
+  printf '      %s\n' $secret_hits
 else ok "no token or key patterns in shipped files"; fi
 
 # 6. Version. The zip is stamped with the commit it came from, so a claude.ai session
 #    can say which upload it is running. -dirty means uncommitted changes went in.
 if git rev-parse --git-dir >/dev/null 2>&1; then
   sha="$(git rev-parse --short HEAD)"
-  if [ -n "$(git status --porcelain -- "${SHIP[@]}")" ]; then
+  if [ -n "$(git status --porcelain -- "${SHIP[@]}" bin/install.sh)" ]; then
     version="$(date +%Y%m%d)-$sha-dirty"
     warn "uncommitted changes in shipped files; version will be $version"
   else
@@ -106,25 +114,32 @@ trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/$NAME"
 for p in "${SHIP[@]}"; do cp -R "$p" "$stage/$NAME/"; done
 find "$stage" -name .DS_Store -delete
+find "$stage" -type d -name __pycache__ -prune -exec rm -rf {} +
 cat > "$stage/$NAME/VERSION" <<EOF
 $version
 built $(date -u +%Y-%m-%dT%H:%M:%SZ) from $(git remote get-url origin 2>/dev/null || echo "a local checkout")
 EOF
 
+targets=("$TARGET")
+[ "$TARGET" != all ] || targets=(claude openai)
 mkdir -p "$OUT"
-zip_path="$OUT/$NAME-$version.zip"
-if [ -e "$zip_path" ]; then
-  say "exists, not overwriting: $zip_path"
-  say "(same commit already built; commit again or remove the old zip yourself)"
-  exit 1
-fi
-( cd "$stage" && zip -qr -X "$zip_path" "$NAME" )
-
-files=$(unzip -Z1 "$zip_path" | grep -vc '/$')
-say ""
-say "Built $zip_path"
-say "  $files files, $(du -h "$zip_path" | cut -f1 | tr -d ' ')"
-say ""
-say "Next: claude.ai → Settings → Capabilities → Skills → upload this zip, replacing"
-say "the previous Ursula. Then start a new chat and ask \"which version of Ursula is this?\""
-say "It should answer $version."
+# Check every destination before writing the first bundle.
+for host in "${targets[@]}"; do
+  suffix=""; [ "$host" != openai ] || suffix="-openai"
+  zip_path="$OUT/$NAME$suffix-$version.zip"
+  if [ -e "$zip_path" ]; then
+    say "exists, not overwriting: $zip_path"
+    exit 1
+  fi
+done
+for host in "${targets[@]}"; do
+  suffix=""; [ "$host" != openai ] || suffix="-openai"
+  printf '%s\n' "$host" > "$stage/$NAME/HOST"
+  zip_path="$OUT/$NAME$suffix-$version.zip"
+  ( cd "$stage" && zip -qr -X "$zip_path" "$NAME" )
+  files=$(unzip -Z1 "$zip_path" | grep -vc '/$')
+  say "Built $zip_path ($files files)"
+done
+say "Claude: upload the Claude zip through the claude.ai Skills menu."
+say "ChatGPT/Codex: see docs/chatgpt.md for installing the OpenAI bundle."
+say "Start a fresh chat and ask which Ursula version is running; expect $version."

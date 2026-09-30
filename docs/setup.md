@@ -1,5 +1,9 @@
 # Setup
 
+For ChatGPT/Codex, first read `docs/chatgpt.md` and `reference/runtime.md`.
+They replace the Claude installation, persistence and board publication steps below;
+the interview and real connector checks remain shared.
+
 Ursula is configured by conversation, not by editing files. Clone the repo, install
 the skill, then talk to Claude. Claude asks the questions below, writes the answers
 into your artifact database, and publishes your board.
@@ -170,14 +174,16 @@ The first planning session is the real acceptance test. Rough shape, from measur
 - **Skip rate** — roughly half of extracted candidates should already have tickets. A
   run creating everything it finds is not reconciling.
 - **Findings** — at least two or three from the core checks and enabled packs, with evidence and a
-  recommendation each. **Zero findings means the analysis pass did not run.** That is
-  the single clearest sign of a lazy run, because the checks are the point.
+  recommendation each. **Zero findings is a red flag**, and the run is treated as
+  having skipped the analysis unless it shows, per check, that the check ran and
+  what evidence it ran against. Never manufacture a finding to reach a count; a
+  clean check with its evidence shown is the honest answer.
 - **Tag proposals** — ranked, with a recommendation on each, and the operator rejecting
   a good number of them.
 - **What it could not do** — stated explicitly. Every run ends with this, even when the
   answer is nothing.
 
-A run that produces tidy tickets, no coverage list and no findings has done the easy
+A run that produces tidy tickets, no coverage list and no recorded analysis has done the easy
 half and should be called out as such rather than accepted.
 
 ## 4. First run

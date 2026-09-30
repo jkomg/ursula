@@ -1,6 +1,6 @@
 ---
 name: ursula
-description: Runs a manager's weekly operating cadence end to end — mines meeting notes from Google Drive and Gmail for commitments, reconciles them against Jira, hunts for contradictions across projects, and produces a one-pager for their own manager. Use this skill whenever the user mentions their weekly plan, weekly retro, Monday planning session, Thursday retro, one-pager, weekly note, "Ursula", their operating cadence, or asks to sweep their Jira boards for what needs attention. Also use it when they paste meeting notes and ask for to-dos to be captured, when they ask what is blocked and on whom, when they ask what they are missing this week, or when they ask to prepare for a one-on-one with their manager or a direct report. Trigger even when the user does not name the skill — "let's do our Monday call", "what's on my plate", "build my note for Adrienne" and "did I miss anything from last week" are all this skill.
+description: Runs a manager's weekly operating cadence end to end — mines meeting notes from Google Drive and Gmail for commitments, reconciles them against Jira, hunts for contradictions across projects, and produces a one-pager for their own manager. Use this skill whenever the user mentions their weekly plan, weekly retro, Monday planning session, Thursday retro, one-pager, weekly note, "Ursula", their operating cadence, or asks to sweep their Jira boards for what needs attention. Also use it when they paste meeting notes and ask for to-dos to be captured, when they ask what is blocked and on whom, when they ask what they are missing this week, when they ask to scan a new hire's board, or when they ask to prepare for a one-on-one with their manager or a direct report. Trigger even when the user does not name the skill — "let's do our Monday call", "what's on my plate", "build my note for Adrienne" and "did I miss anything from last week" are all this skill.
 ---
 
 # Ursula
@@ -12,18 +12,36 @@ prioritised week and a defensible one-pager.
 **The analysis pass is the skill.** Mining and ticket-writing are plumbing that any
 script could do. The value is catching that a dependency is scheduled after the thing
 that consumes it, that an access grant does not do what someone thinks it does, or
-that a fix applied to three tickets left two templates broken. If a run produces
-tidy tickets and no findings, the run failed.
+that a fix applied to three tickets left two templates broken. A run that skips
+analysis and produces only tidy tickets has failed. Zero findings is valid when the
+checks ran against complete evidence; report which ran clean and never invent a finding.
+
+## Runtime
+
+Ursula runs in Claude or in ChatGPT/Codex. The procedure below is the same in both
+and uses two host-neutral terms:
+
+- **The state store** — where config, state, findings, runs, hires and changesets
+  live, in the shapes in `config/schema.md`.
+- **The board** — the standing page the operator returns to.
+
+`reference/runtime.md` says what each term is on each host, how to tell which host
+you are in (`HOST` in the bundle is a hint; the tools actually present are the
+answer), and how to publish the board there. Read it before setup or a cadence, and
+follow it wherever this file says "read the state store" or "update the board".
+Host differences belong in that file, not here: one cadence, one set of checks.
 
 ## Mode
 
 Read `config/run.mode` before doing anything that writes.
 
-- **`dry-run`** — read everything real, write nothing, emit a changeset of every
-  create, edit, comment and tag proposal. The default for a new operator. Stay here
+- **`dry-run`** — read everything real, write nothing to Jira or Calendar, emit a
+  changeset of every create, edit, comment and tag proposal. The run log and findings
+  are still recorded, so the board fills. The default for a new operator. Stay here
   for two full cadences.
 - **`sandbox`** — reads real, all writes redirected to `config/run.sandbox_project`.
-  For proving write mechanics.
+  For proving Jira write mechanics. Calendar changes remain proposals; sandbox
+  progress never advances the live watermark or live ingested map.
 - **`live`** — normal.
 
 State the active mode at the top of every session, with the skill version from the
@@ -53,17 +71,19 @@ instance changes a meeting the other organises.
 
 ## Before anything else
 
-1. **Load config.** Read `config/*` from the operator's artifact database
-   (`read_db`, collection `config`). No config means this is a first run — go to
+1. **Load config.** Read `config/*` from the state store. No config means this is
+   a first run — go to
    `docs/setup.md`, do the interview, and satisfy its **completion contract** before
    anything else. Never guess project keys or cadence.
    If `config/run.status` is `incomplete`, say what is missing and fix that first.
-2. **Confirm connectors.** Atlassian, Google Drive, Gmail and Calendar must be
-   present. If Atlassian is missing, stop and say so — see
-   `docs/troubleshooting.md`, because the artifact board keeps working while chat
-   access is gone and that looks like everything is fine when it isn't.
+2. **Confirm connectors.** Jira, Google Drive, Gmail and Calendar must be readable,
+   along with Slack for the full cadence. Prove each with a read, not by the name of
+   a connector. If Jira is missing, stop and say so — see `docs/troubleshooting.md`,
+   because the board keeps working while chat access is gone and that looks like
+   everything is fine when it isn't.
 3. **Read the watermark.** `state/watermark` gives the timestamp of the last
-   successful mine. Everything since then is new.
+   successful mine. Freeze the end of this run's window before collecting; read
+   `reference/run-recovery.md` for window bounds, changesets and resuming partial writes.
 
 ## Monday: plan
 
@@ -76,7 +96,8 @@ the question comes at the end it gets skipped.
 
 ### Pass 1 — mine
 
-Everything since the watermark. See `reference/mining.md` for the queries and the
+Everything between the watermark and the frozen window end. Calendar attachments
+are the primary notes index; Drive search is the backstop. See `reference/mining.md` for the queries and the
 naming patterns.
 
 - Google Drive: Gemini notes documents — the main source
@@ -153,22 +174,25 @@ and priorities agreed in the same pass.
 
 ### Pass 5 — write back
 
-In `dry-run`, emit the changeset and stop. Otherwise create and update Jira.
+In `dry-run`, emit the changeset and stop: no Jira or Calendar writes and no
+one-pager staging comment. The run log and findings below are still written — they
+are the operator's own record, and they are how the board shows that the checks ran
+during the two cadences an operator spends in dry-run. Otherwise create and update
+Jira, recording each outcome as in `reference/run-recovery.md` so a partial batch
+can be resumed.
 
-Update the standing artifact board **in place**. It is a living document that
-carries week to week, never a fresh artifact per week. Read the existing page
-first and edit it; if it cannot be read, **do not publish** — a generated
-replacement silently discards a working board.
+Update the board **in place**, the way `reference/runtime.md` says for this host.
+It is a living document that carries week to week, never a fresh one per week.
+Read the existing board first and edit it; if it cannot be read, **do not
+publish** — a generated replacement silently discards a working board.
 
-Omit the `capabilities` field on republish so the stored declaration carries
-forward. Restating it is a full-set operation and drops anything not repeated,
-which leaves the page rendering normally and unable to reach Jira. The baseline
-copy is in `artifact/index.html`.
-
-Write the run log (`runs/<date>-<session>`), each finding (`findings/<key>`), the new
-watermark and the ingested map to the database, in the shapes in `config/schema.md` —
-the board's Findings and Log tabs render exactly those fields. Advance the watermark
-only on a fully successful run.
+Write the run log (`runs/<date>-<session>`) and each finding (`findings/<key>`) to
+the state store, in every mode, in the shapes in `config/schema.md` — the
+board's Findings and Log tabs render exactly those fields, and each record carries
+its `mode`. Then, outside `dry-run`, write the ingested map and the new watermark.
+Advance the watermark only on a fully successful run, to the frozen window end, as
+the last state write. A dry-run created nothing, so it advances nothing: the next
+run mines the same window again and reconciliation skips what already exists.
 
 ## Thursday: retro and one-pager
 
@@ -183,7 +207,8 @@ only on a fully successful run.
 
 ### Staging, not recall
 
-When a finding surfaces on any day, write it immediately as a comment on the
+When a finding surfaces on any day, propose a staging comment (emit it only in
+dry-run); in sandbox/live write an authorized comment on the
 one-pager's own ticket, under the section it belongs to. Thursday then becomes
 assembly rather than memory. This is the single practice that makes the retro
 cheap, and it only works if it happens continuously.
@@ -197,6 +222,13 @@ recommendation**, risks that bite in thirty days, and the agreed numbers.
 A decision listed without a recommendation is unfinished work. If a number cannot
 be produced, say why in one line rather than omitting it — an honest gap reads
 better than a silent one, and often exposes the real problem.
+
+## Any day: hire scan
+
+"Scan Vandit's board" — one watched board, one person, written to a tab of its own on
+the operator's board, usually before the week's one-to-ones. Read-only on their board
+in every mode. The procedure, what it writes and what it must not say are in
+`reference/hire-scan.md`; read it before starting.
 
 ## Working rules
 
@@ -234,6 +266,10 @@ own board.
 | `reference/mining.md` | Every run. Queries, naming patterns, untitled-meeting matching. |
 | `reference/jira-conventions.md` | Before any Jira write. Transition IDs, the label-replacement trap, response envelopes, result caps. |
 | `reference/artifact-board.md` | When updating or rebuilding the board. |
+| `reference/hire-scan.md` | When asked to scan one person's board. |
+| `reference/runtime.md` | Before setup or a cadence. Host tools, state and board adapter. |
+| `reference/run-recovery.md` | Every mine and write batch. Bounded windows and partial-run recovery. |
+| `docs/chatgpt.md` | Installing or setting up in ChatGPT/Codex. |
 | `docs/setup.md` | First run, or onboarding a new operator. |
 | `docs/sandbox.md` | Before the first run anywhere. Modes, prohibitions, how to test. |
 | `test/golden-week.md` | Regression fixture — a week processed by hand. |
@@ -247,8 +283,8 @@ A Monday run that produces six new tickets, skips four that already existed,
 surfaces three findings the operator had not seen, proposes eleven tags of which
 they accept eight, and flags one calendar collision.
 
-A Monday run that produces twenty tidy tickets and no findings has done the easy
-half and called it done.
+A Monday run that produces twenty tidy tickets without executing and reporting the
+checks has done the easy half and called it done.
 
 Every run ends with four things, and a run missing any of them is incomplete:
 
@@ -257,6 +293,7 @@ Every run ends with four things, and a run missing any of them is incomplete:
 2. **The skip count** — how many candidates already had tickets. Near zero means
    reconciliation did not happen.
 3. **The findings** — from the core checks and enabled packs, with evidence and a recommendation.
-   None is a red flag, not a clean bill of health; say which checks ran clean.
+   If none fire, say which checks ran clean and which lacked evidence. Missing
+   evidence is a gap, not proof that a check passed.
 4. **What could not be done** — unreachable boards, capped queries, unopenable
    documents, checks that could not run.
