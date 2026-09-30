@@ -56,6 +56,10 @@ or working Jira write buttons. Keep one agreed output path and update it in plac
 read any existing snapshot before replacement. A renderer cannot infer completeness
 of connector reads; preserve `could_not` and partial status from the session.
 
+ChatGPT/Codex has no check-ins and no outbox that sends. Keep the outbox shape in
+the export so proposals are recorded, and give the operator each message's exact text
+to send themselves. Never claim a message was sent.
+
 ## Tool translations
 
 | Existing reference | Host-neutral requirement |

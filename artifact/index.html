@@ -141,6 +141,24 @@
   .hitem > div{min-width:0;overflow-wrap:anywhere}
   .agenda{margin:0;padding:10px 14px 10px 32px;font-size:14px}
   .agenda li{margin:3px 0}
+  .voice{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+  .voice .move[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .voice label{font-size:12.5px;color:var(--dim);display:flex;gap:5px;align-items:center}
+  .vhelp{font-size:12.5px;color:var(--dim);margin:6px 0 0}
+  .banner{margin-top:14px;padding:9px 12px;border:1px dashed var(--should);border-radius:8px;color:var(--should);font-size:13px}
+  .obx{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:8px;padding:12px 14px;margin-bottom:9px}
+  .obx.closed{border-left-color:var(--line)}
+  .obx.closed .obody{opacity:.75}
+  .obx h4{margin:0;font-size:15px;overflow-wrap:anywhere}
+  .obx .to{font-size:13px;margin-top:4px;overflow-wrap:anywhere}
+  .obx .to b{font-weight:600}
+  .obx .why{font-size:12.5px;color:var(--dim);margin-top:4px}
+  .obody{white-space:pre-wrap;font-size:13.5px;background:var(--bg);border-radius:6px;padding:9px 11px;margin-top:8px;overflow-wrap:anywhere}
+  textarea.obody{width:100%;border:1px solid var(--line);color:var(--ink);font:inherit;font-size:13.5px;resize:vertical;min-height:90px}
+  .obx .rcpt{font-size:12px;color:var(--dim);margin-top:6px;overflow-wrap:anywhere}
+  .obx .acts{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);align-items:center}
+  .run.checkin{padding:7px 14px;font-size:13px}
   footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px}
   @media(max-width:600px){ .top{flex-wrap:wrap} .st{order:3} .day{flex-wrap:wrap} .day b{flex-basis:100%}
     .fnd dl{grid-template-columns:1fr} .fnd dt{padding-top:6px} }
@@ -157,6 +175,7 @@
 <nav class="tabs" role="tablist">
   <button role="tab" data-tab="week" aria-selected="true">This week</button>
   <span id="hiretabs" style="display:contents"></span>
+  <button role="tab" data-tab="outbox" aria-selected="false">Outbox<span class="n" id="ocount"></span></button>
   <button role="tab" data-tab="findings" aria-selected="false">Findings<span class="n" id="fcount"></span></button>
   <button role="tab" data-tab="log" aria-selected="false">Log<span class="n" id="lcount"></span></button>
 </nav>
@@ -181,6 +200,19 @@
   <div id="hire"></div>
 </div>
 
+<div class="view" id="v-outbox" hidden>
+  <div class="panel" style="padding:12px 14px">
+    <div class="eyebrow">Between sessions</div>
+    <div class="voice" id="voice"></div>
+    <p class="vhelp" id="vhelp"></p>
+    <div class="voice" id="vchan"></div>
+    <div class="sync" id="vstatus"></div>
+  </div>
+  <div id="obanner"></div>
+  <div id="ostatus" class="sync" style="margin-top:14px"></div>
+  <div id="outbox"></div>
+</div>
+
 <div class="view" id="v-findings" hidden>
   <div id="fstatus" class="sync" style="margin-top:14px"></div>
   <div id="findings"></div>
@@ -201,6 +233,8 @@ const CFG = {
   JQL: 'assignee = currentUser() AND labels = "%LABEL%" ORDER BY duedate ASC, priority DESC',
   JIRA: "Atlassian",                     // connector display name
   GCAL: "Custom Google Drive",           // connector exposing google_calendar_events_list
+  GMAIL: "Custom Google Drive",          // connector exposing gws_gmail_send and gws_calendar_events_insert
+  SLACK: "Slack",                        // connector exposing slack_send_message
   DAY_START: 9, DAY_END: 18,             // working window for gap detection
   MIN_GAP: 45                            // minutes; shorter gaps aren't real work time
 };
@@ -635,7 +669,7 @@ function showDiagnostics(){
 }
 
 /* ---------- tabs ---------- */
-const TABS = ["week","findings","log"];
+const TABS = ["week","outbox","findings","log"];
 let currentTab = "week", wantedTab = "week";
 function showTab(t){
   wantedTab = t;
@@ -790,6 +824,15 @@ function renderRuns(runs){
   }
   for(const r of runs){
     const st = str(r.status) || "complete";
+    if(r.session === "checkin"){
+      // Check-ins are frequent and small: one line each, problems still visible.
+      const c = el("article", "run checkin" + (st === "complete" ? "" : " " + st));
+      const cn = arr(r.could_not).map(str).filter(Boolean);
+      c.appendChild(el("span","", str(r.date).slice(0,10) + " · check-in " + str(r.time || "") +
+        " · " + (str(r.summary) || st) + (cn.length ? " · could not: " + cn.join("; ") : "")));
+      host.appendChild(c);
+      continue;
+    }
     const c = el("article", "run" + (st === "complete" ? "" : " " + st));
     const top = el("div","top");
     top.appendChild(el("b","", str(r.date).slice(0,10) + " · " + (str(r.session) || "session")));
@@ -834,7 +877,7 @@ function renderRuns(runs){
   }
 }
 
-let canWrite = null;
+let canWrite = null, viewerId = null;
 function watchRecords(){
   if(!db){
     $("fstatus").textContent = $("lstatus").textContent = "Database not available in this view.";
@@ -848,7 +891,7 @@ function watchRecords(){
     renderHireTabs();
     if(/^hire:/.test(currentTab)) renderHire(currentTab.slice(5));
   }, e => { $("fstatus").className = "sync bad"; $("fstatus").textContent = dbErr(e); });
-  db.collection("runs").orderBy("date","desc").limit(52).onSnapshot(snap => {
+  db.collection("runs").orderBy("date","desc").limit(150).onSnapshot(snap => {
     $("lstatus").textContent = snap.metadata.fromCache ? "Refreshing…" : "";
     renderRuns(snap.docs.map(d => d.data() || {}));
   }, e => { $("lstatus").className = "sync bad"; $("lstatus").textContent = dbErr(e); });
@@ -1022,6 +1065,217 @@ function watchHires(){
   }, () => {});
 }
 
+/* ---------- outbox ----------
+   Proposals written by sessions and check-ins; this page approves, sends and keeps
+   the receipt. Rules and fields: reference/outbox.md. The page sends nothing for a
+   dry-run item, for an item proposed in another mode than the current one, or for an
+   expired one. Bodies are shared data: textContent only. */
+let outbox = [], runMode = null, voice = null, showDecided = false;
+const OPEN_OB = new Set(["proposed"]);
+const KIND = {email:"Email", slack:"Slack message", jira_comment:"Jira comment", calendar_block:"Focus block"};
+const LEVELS = [
+  ["quiet","Quiet","Only when something needs your OK, or a serious finding. No findings, no messages."],
+  ["daily","Daily","Quiet, plus a morning note and an end-of-day note of what was handled."],
+  ["chatty","Chatty","Every check-in reports what it read, matched, skipped and why."]
+];
+const nowIso = () => new Date().toISOString();
+const expired = o => o.expires_at && Date.parse(o.expires_at) < Date.now();
+
+function payloadOf(r){
+  if(r && r.payload !== undefined && r.payload !== null) return r.payload;
+  if(r && r.structuredContent) return r.structuredContent;
+  const t = r && Array.isArray(r.content) ? (r.content.find(c => c.type === "text") || {}).text : null;
+  if(t){ try{ return JSON.parse(t); }catch(e){ return {text: t}; } }
+  return r;
+}
+async function send(o, body){
+  const t = o.target || {};
+  if(o.kind === "email"){
+    const p = payloadOf(await mcp.callTool(CFG.GMAIL, "gws_gmail_send",
+      {args: ["--to", str(o.to), "--subject", str(o.subject), "--body", body]}));
+    if(!p || !p.id) throw {code:"bad_shape", detail:"Gmail answered without a message id"};
+    return {id: p.id, threadId: p.threadId || null};
+  }
+  if(o.kind === "slack"){
+    const p = payloadOf(await mcp.callTool(CFG.SLACK, "slack_send_message", {channel_id: str(o.to), message: body}));
+    return {text: str(p && (p.text || JSON.stringify(p))).slice(0, 300)};
+  }
+  if(o.kind === "jira_comment"){
+    if(!cloudId) cloudId = await resolveCloudId();
+    const p = unwrap(await call(CFG.JIRA, "addCommentToJiraIssue", {cloudId, issueIdOrKey: str(t.key || o.target), commentBody: body}));
+    return {issue: str(t.key || o.target), id: p && p.id ? String(p.id) : null};
+  }
+  if(o.kind === "calendar_block"){
+    const p = payloadOf(await mcp.callTool(CFG.GMAIL, "gws_calendar_events_insert", {
+      params: {calendarId: "primary"},
+      json: {summary: str(t.title) || "Focus", start: {dateTime: str(t.start)}, end: {dateTime: str(t.end)}, transparency: "opaque"}}));
+    if(!p || !p.id) throw {code:"bad_shape", detail:"Calendar answered without an event id"};
+    return {id: p.id, link: p.htmlLink || null};
+  }
+  throw {code:"bad_request", detail:"unknown kind " + str(o.kind)};
+}
+function whyNot(o){
+  if(runMode === null) return "Checking the run mode…";
+  if(o.mode === "dry-run" || runMode === "dry-run") return "Dry run: nothing sends. Mark whether it is right.";
+  if(runMode && o.mode && o.mode !== runMode) return "Proposed in " + o.mode + " mode; Ursula is now in " + runMode + ". Not sent.";
+  if(expired(o)) return "Expired " + str(o.expires_at).slice(0,16).replace("T"," ") + ". Not sent.";
+  if(!mcp) return "No connector access in this view.";
+  return null;
+}
+function obCard(o){
+  const status = str(o.status) || "proposed";
+  const open = OPEN_OB.has(status);
+  const c = el("article", "obx" + (open ? "" : " closed"));
+  c.appendChild(el("h4","", (KIND[o.kind] || str(o.kind)) + (o.subject ? " · " + str(o.subject) : "")));
+  const to = el("div","to");
+  const t = o.target || {};
+  const who = o.kind === "jira_comment" ? "on " + str(t.key || o.target)
+    : o.kind === "calendar_block" ? str(t.start).replace("T"," ").slice(0,16) + " – " + str(t.end).slice(11,16) + " on your calendar"
+    : "to " + (str(o.to_label) || str(o.to));
+  to.appendChild(el("b","", who));
+  c.appendChild(to);
+  if(o.why) c.appendChild(el("div","why", str(o.why)));
+  const tg = el("div","tags");
+  tg.appendChild(el("span","tag" + (open ? " due" : ""), status));
+  if(o.mode) tg.appendChild(el("span","tag", str(o.mode)));
+  tg.appendChild(el("span","tag", "from " + (str(o.proposed_by) || "?") + " " + str(o.proposed_at).slice(0,16).replace("T"," ")));
+  for(const r of arr(o.refs)){
+    const url = str(r && r.url);
+    if(/^https:\/\//.test(url)){ const a = el("a","tag", str(r.label) || url); a.href = url; a.target = "_blank"; a.rel = "noopener"; tg.appendChild(a); }
+  }
+  c.appendChild(tg);
+
+  const blocked = open ? whyNot(o) : null;
+  const dry = open && (o.mode === "dry-run" || runMode === "dry-run");
+  let box;
+  if(open && !blocked && o.kind !== "calendar_block"){ box = el("textarea","obody"); box.value = str(o.body); }
+  else box = el("div","obody", str(o.body) || (o.kind === "calendar_block" ? str(t.title) : ""));
+  if(o.body || o.kind === "calendar_block") c.appendChild(box);
+
+  const rc = [];
+  if(o.approved_at) rc.push("approved " + str(o.approved_at).slice(0,16).replace("T"," ") + (o.edited ? " (you edited it)" : ""));
+  if(o.sent_at) rc.push("sent " + str(o.sent_at).slice(0,16).replace("T"," "));
+  if(o.receipt) rc.push("receipt " + Object.entries(o.receipt).filter(([,v]) => v).map(([k,v]) => k + " " + v).join(", "));
+  if(o.verdict) rc.push("dry-run verdict: " + str(o.verdict));
+  if(o.reject_note) rc.push("rejected: " + str(o.reject_note));
+  if(o.error) rc.push(str(o.error));
+  if(rc.length) c.appendChild(el("div","rcpt", rc.join(" · ")));
+
+  if(open && db && canWrite !== false){
+    const acts = el("div","acts"); const sync = el("span","sync");
+    const ref = db.doc("outbox/" + o._id);
+    const lock = on => Array.from(acts.querySelectorAll("button")).forEach(b => b.disabled = on);
+    const fail = (e, what) => { sync.className = "sync bad"; sync.textContent = what + " — " + (e && e.code ? errText(e) : dbErr(e)); lock(false); };
+    if(dry){
+      for(const [label, verdict] of [["Right","right"],["Wrong","wrong"]]){
+        const b = el("button","move",label);
+        b.addEventListener("click", async () => {
+          lock(true);
+          try{ await ref.update({status:"reviewed", verdict, reviewed_at: nowIso(), reviewed_by: viewerId}); }
+          catch(e){ fail(e, "Not saved"); }
+        });
+        acts.appendChild(b);
+      }
+    } else if(!blocked){
+      const go = el("button","push", o.kind === "calendar_block" ? "Approve and add" : "Approve and send");
+      go.addEventListener("click", async () => {
+        lock(true);
+        const body = box.tagName === "TEXTAREA" ? box.value : str(o.body);
+        const edited = box.tagName === "TEXTAREA" && body !== str(o.body);
+        // Record the approval first: if that fails, nothing is sent.
+        try{
+          await ref.update(Object.assign({status:"approved", approved_at: nowIso(), approved_by: viewerId, edited},
+            edited ? {original_body: str(o.body), body} : {}));
+        }catch(e){ fail(e, "Approval not saved, nothing sent"); return; }
+        sync.className = "sync"; sync.textContent = "Sending…";
+        try{
+          const receipt = await send(o, body);
+          await ref.update({status:"sent", sent_at: nowIso(), receipt});
+        }catch(e){
+          const c2 = e && e.code;
+          // No reply in time is not proof it did not go: say so, and block a blind retry.
+          const unknown = c2 === "server_unavailable" || c2 === "upstream_error";
+          await ref.update({status: unknown ? "unknown" : "failed",
+            error: (unknown ? "Outcome unknown — check before sending again: " : "Not sent: ") + errText(e)}).catch(() => {});
+        }
+      });
+      acts.appendChild(go);
+    } else {
+      acts.appendChild(el("span","sync", blocked));
+    }
+    const no = el("button","move","Reject");
+    const why = el("textarea","note"); why.rows = 1; why.placeholder = "Why not (optional) — Ursula reads this"; why.style.display = "none";
+    no.addEventListener("click", async () => {
+      if(why.style.display === "none"){ why.style.display = ""; why.focus(); no.textContent = "Confirm reject"; return; }
+      lock(true);
+      try{ await ref.update({status:"rejected", rejected_at: nowIso(), rejected_by: viewerId, reject_note: why.value.trim() || null}); }
+      catch(e){ fail(e, "Not saved"); }
+    });
+    if(!dry) acts.appendChild(no);
+    acts.appendChild(sync); acts.appendChild(why);
+    c.appendChild(acts);
+  }
+  return c;
+}
+function renderOutbox(){
+  const host = $("outbox"); host.innerHTML = "";
+  $("obanner").innerHTML = "";
+  if(runMode === "dry-run") $("obanner").appendChild(el("div","banner","Dry run: proposals show here but nothing sends. Mark each one right or wrong; that is how Ursula learns what you would send."));
+  const open = outbox.filter(o => OPEN_OB.has(str(o.status) || "proposed"));
+  const done = outbox.filter(o => !OPEN_OB.has(str(o.status) || "proposed"));
+  $("ocount").textContent = open.length ? String(open.length) : "";
+  if(!outbox.length){ host.appendChild(el("div","empty","Nothing proposed yet. When Ursula wants to send, add or book something for you, it waits here for your OK.")); return; }
+  const h1 = el("h2","", "Needs your OK"); h1.appendChild(el("em","", open.length ? String(open.length) : "nothing waiting"));
+  host.appendChild(h1);
+  for(const o of open) host.appendChild(obCard(o));
+  if(done.length){
+    const h = el("h2"); h.style.cursor = "pointer"; h.style.color = "var(--dim)"; h.textContent = "Sent and decided";
+    h.appendChild(el("em","", done.length + (showDecided ? " · click to hide" : " · click to show")));
+    h.addEventListener("click", () => { showDecided = !showDecided; renderOutbox(); });
+    host.appendChild(h);
+    if(showDecided) for(const o of done) host.appendChild(obCard(o));
+  }
+}
+function renderVoice(){
+  const cur = (voice && voice.level) || "quiet";
+  const host = $("voice"); host.innerHTML = "";
+  host.appendChild(el("span","sync","How much you hear:"));
+  for(const [k, label] of LEVELS){
+    const b = el("button","move",label); b.setAttribute("aria-pressed", k === cur ? "true" : "false");
+    b.disabled = !db || canWrite === false;
+    b.addEventListener("click", () => saveVoice({level: k}));
+    host.appendChild(b);
+  }
+  $("vhelp").textContent = (LEVELS.find(l => l[0] === cur) || LEVELS[0])[2];
+  const ch = (voice && voice.channels) || {slack_dm: true, email_self: true};
+  const vc = $("vchan"); vc.innerHTML = "";
+  for(const [k, label] of [["email_self","Email me when something needs my OK"],["slack_dm","Keep a running note in my Slack DM"]]){
+    const lb = el("label"); const cb = document.createElement("input"); cb.type = "checkbox"; cb.id = "vc-" + k;
+    cb.checked = ch[k] !== false; cb.disabled = !db || canWrite === false;
+    cb.addEventListener("change", () => saveVoice({channels: Object.assign({}, ch, {[k]: cb.checked})}));
+    lb.appendChild(cb); lb.appendChild(document.createTextNode(label)); vc.appendChild(lb);
+  }
+}
+async function saveVoice(patch){
+  $("vstatus").className = "sync"; $("vstatus").textContent = "Saving…";
+  try{
+    const ref = db.doc("config/voice");
+    const next = Object.assign({updated_at: nowIso(), updated_by: viewerId}, patch);
+    if(voice) await ref.update(next); else await ref.set(Object.assign({level:"quiet", channels:{slack_dm:true, email_self:true}}, next));
+    $("vstatus").className = "sync ok"; $("vstatus").textContent = "Saved. The next check-in uses it.";
+  }catch(e){ $("vstatus").className = "sync bad"; $("vstatus").textContent = "Not saved — " + dbErr(e); }
+}
+function watchOutbox(){
+  if(!db){ $("ostatus").textContent = "Database not available in this view."; renderOutbox(); renderVoice(); return; }
+  db.doc("config/run").onSnapshot(s => { runMode = s.exists ? str((s.data() || {}).mode) || "dry-run" : "dry-run"; renderOutbox(); }, () => {});
+  db.doc("config/voice").onSnapshot(s => { voice = s.exists ? s.data() : null; renderVoice(); }, () => {});
+  db.collection("outbox").orderBy("proposed_at","desc").limit(200).onSnapshot(snap => {
+    outbox = snap.docs.map(d => Object.assign({_id: d.id}, d.data() || {}));
+    $("ostatus").textContent = snap.metadata.fromCache ? "Refreshing…" : "";
+    renderOutbox();
+  }, e => { $("ostatus").className = "sync bad"; $("ostatus").textContent = dbErr(e); });
+}
+
 /* ---------- local note drafts ---------- */
 async function saveDrafts(){
   if(!db) return;
@@ -1047,12 +1301,14 @@ async function saveDrafts(){
   }catch(e){}
   try{
     const u = await claude.use("user");
-    if(u) canWrite = await u.can("data.write");
+    if(u){ canWrite = await u.can("data.write"); viewerId = await u.id(); }
   }catch(e){}
   watchRecords();
   watchHires();
+  watchOutbox();
 
   mcp = await claude.use("mcp");
+  renderOutbox();
   if(mcp && /^hire:/.test(currentTab)) renderHire(currentTab.slice(5));
   if(!mcp){ setStatus("No connector access — this page can't reach Jira or Calendar from here.", true); return; }
 

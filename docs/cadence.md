@@ -33,6 +33,11 @@ Thursday night, the retro is Thursday early afternoon.
 
 ## Between sessions
 
+With check-ins on (`docs/routine.md`), a routine does the between-session work a few
+times a day: it reads the operator's DM, mines what arrived, stages findings and puts
+anything that should happen in the outbox for approval. `reference/always-on.md` is the
+procedure. Without check-ins, the same practice is manual, and it is this:
+
 The continuous practice is staging. A finding on Tuesday becomes a comment on the
 one-pager's ticket on Tuesday, under the section it belongs to. Thursday is then
 assembly, not recall.

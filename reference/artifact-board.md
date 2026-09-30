@@ -37,11 +37,18 @@ Three tabs. The selected tab is remembered per browser.
   from Jira, read-only, with the items the scan named marked. The live read uses the
   same `searchJiraIssuesUsingJql` grant as This week, so the tab needs no new
   capability.
+- **Outbox** — the `outbox` collection (`reference/outbox.md`): what is waiting for the
+  operator's OK first, then everything sent and decided, folded. Approving sends with the
+  viewer's own connector and writes the receipt; the text can be edited before sending,
+  and the original is kept. Dry-run items get Right / Wrong instead of Approve. The top
+  of the tab is the heads-up control — Quiet, Daily, Chatty and the two channels — which
+  writes `config/voice`, the one config document the board changes.
 - **Findings** — the `findings` collection, open ones ordered by `rank`, closed ones
   folded underneath. Each shows evidence, consequence, recommendation and links. The
   operator can mark one resolved or not a finding (with a reason); that writes back to
   the database for the next session, never to Jira.
-- **Log** — the `runs` collection, newest first. One entry per session. This is the tab
+- **Log** — the `runs` collection, newest first. One entry per session; check-ins are one
+  line each, with anything they could not do. This is the tab
   that answers "what happened three weeks ago," and it is the reason the state lives in
   the database rather than in Claude's memory. An entry missing the coverage list, skip
   count or could-not list is marked *not recorded*.
@@ -55,12 +62,24 @@ person at a time; the Thursday sweep still produces the all-boards view in chat.
 
 ## Publishing this version
 
-`artifact/index.html` is the baseline. It needs the capabilities the live board already
-has — `mcp` (Atlassian: `getAccessibleAtlassianResources`, `searchJiraIssuesUsingJql`,
-`getTransitionsForJiraIssue`, `transitionJiraIssue`, `addCommentToJiraIssue`; Custom
-Google Drive: `google_calendar_events_list`), `db` and `user` — and no new ones. So
-republish it to the existing URL **with `capabilities` omitted**. Passing a set would
-replace the stored one and risk dropping a connector grant.
+`artifact/index.html` is the baseline. **This version adds tools**, for the Outbox tab, so
+the first republish of it must pass the **complete** set, not omit it:
+
+```json
+{"db": {}, "user": {},
+ "mcp": {"servers": [
+   {"server": "Atlassian", "tools": ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql",
+     "getTransitionsForJiraIssue", "transitionJiraIssue", "addCommentToJiraIssue"]},
+   {"server": "Custom Google Drive", "tools": ["google_calendar_events_list", "gws_gmail_send",
+     "gws_calendar_events_insert"]},
+   {"server": "Slack", "tools": ["slack_send_message"]}]}}
+```
+
+Read the live board's stored set first and add anything it has that this list lacks: a
+full-set declaration revokes whatever it leaves out. Every later republish omits
+`capabilities` again. The viewer is asked once for each newly granted connector, on
+first use. The Slack send's answer shape has not been observed from the page; the board
+keeps the first 300 characters of it as the receipt until it has been.
 
 ## Updating
 

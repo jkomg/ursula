@@ -256,3 +256,20 @@ restored to a red flag that must be argued away per check, keeping the rule agai
 manufacturing findings. Also: `bin/install.sh --help` no longer prints a stray script
 line, the secret scan reports `file:line` without the value, and `docs/release.md`
 records the working test command. No run.
+
+
+## 2026-09-30 — always-on spike (`spike/FINDINGS.md`)
+
+Proved from a one-off cloud routine: writing the board database, a Slack DM to the
+operator, and propose → approve on the board → Gmail send with the receipt kept
+(gmail id `1a0f35c7d34a10a0`). Defects found and fixed in this change:
+
+- **Invented timestamps.** The routine wrote a midnight time and one later than the
+  store's own write. Fix: every time comes from `date -u` (SKILL.md working rules,
+  `reference/always-on.md`).
+- **Thread-only reply read.** Both operator replies went into the DM, not the thread,
+  and a thread read found none. Fix: check-ins read the whole DM since
+  `state/checkin.slack_last_ts`, no prefix or threading required.
+- **Slack DM does not notify.** The connector posts as the operator, so their own DM
+  raises no alert. Fix: the DM is the record and reply channel; the interrupt is email
+  to the operator's own address. Not yet confirmed that email alerts.

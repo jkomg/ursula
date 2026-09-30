@@ -1,6 +1,6 @@
 ---
 name: ursula
-description: Runs a manager's weekly operating cadence end to end — mines meeting notes from Google Drive and Gmail for commitments, reconciles them against Jira, hunts for contradictions across projects, and produces a one-pager for their own manager. Use this skill whenever the user mentions their weekly plan, weekly retro, Monday planning session, Thursday retro, one-pager, weekly note, "Ursula", their operating cadence, or asks to sweep their Jira boards for what needs attention. Also use it when they paste meeting notes and ask for to-dos to be captured, when they ask what is blocked and on whom, when they ask what they are missing this week, when they ask to scan a new hire's board, or when they ask to prepare for a one-on-one with their manager or a direct report. Trigger even when the user does not name the skill — "let's do our Monday call", "what's on my plate", "build my note for Adrienne" and "did I miss anything from last week" are all this skill.
+description: Runs a manager's weekly operating cadence end to end — mines meeting notes from Google Drive and Gmail for commitments, reconciles them against Jira, hunts for contradictions across projects, and produces a one-pager for their own manager. Use this skill whenever the user mentions their weekly plan, weekly retro, Monday planning session, Thursday retro, one-pager, weekly note, "Ursula", their operating cadence, or asks to sweep their Jira boards for what needs attention. Also use it when they paste meeting notes and ask for to-dos to be captured, when they ask what is blocked and on whom, when they ask what they are missing this week, when they ask to scan a new hire's board, on a scheduled check-in, when they ask what awaits their OK, or when they ask to prepare for a one-on-one with their manager or a direct report. Trigger even when the user does not name the skill — "let's do our Monday call", "what's on my plate", "build my note for Adrienne" and "did I miss anything from last week" are all this skill.
 ---
 
 # Ursula
@@ -51,9 +51,13 @@ testing. An operator who thinks they are
 in dry-run and is not will find out the expensive way.
 
 **Prohibitions, in every mode.** The gateway exposes write tools well beyond Jira.
-**Never send email. Never post, draft or react in Slack. Never edit, move, archive,
-delete or comment on a Confluence page.** Those put words in the operator's mouth to
-other people, and nothing this skill does requires it.
+**Never send email or a Slack message to anyone yourself. Never react in Slack. Never
+edit, move, archive, delete or comment on a Confluence page.** Words in the operator's
+mouth to other people go through the **outbox** (`reference/outbox.md`): Ursula writes
+the exact message as a proposal, the operator approves it on the board, and the board
+sends it with their connector and keeps the receipt. Ursula may write to the operator
+alone — their own Slack DM, their own email address — without the outbox, because
+nobody else reads it (`reference/always-on.md`, "Heads-up").
 
 **Calendar writes are allowed, under approval, in tiers.** Blocking time is not the
 same act as sending a message, and a planning session that finds three collisions and
@@ -64,6 +68,9 @@ cannot fix any of them is doing half a job. Never in `dry-run`.
 | 1 | Create or move a focus block on the operator's own calendar, no other attendees | Propose in the batch; one approval covers several |
 | 2 | Decline or accept an invitation on the operator's behalf | Per-event approval. The organiser is notified, so name who finds out |
 | 3 | Modify or delete an event with other attendees, or invite anyone | Per-event approval, and state who is affected before asking |
+
+Messages follow the same tiers: an email, a Slack message or a comment another person
+will read is tier 3, one outbox item and one approval each.
 
 Never touch an event on a shared team calendar or one the operator does not own,
 at any tier, without tier-3 approval. When two operators run this skill, neither
@@ -223,6 +230,20 @@ A decision listed without a recommendation is unfinished work. If a number canno
 be produced, say why in one line rather than omitting it — an honest gap reads
 better than a silent one, and often exposes the real problem.
 
+## Between sessions: check-ins
+
+A scheduled cloud routine (`docs/routine.md`) runs a short **check-in** a few times a
+day: it reads what the operator told it in their Slack DM, mines what arrived since the
+last check-in, runs the checks that cannot wait, writes findings, and puts anything
+that should happen in the outbox. It tells the operator only as much as
+`config/voice.level` asks for, from `quiet` to `chatty`. It never tags, never assembles
+the one-pager and never advances `state/watermark`; those belong to Monday and
+Thursday. The procedure is `reference/always-on.md`; read it before a check-in.
+
+When the operator has check-ins on, Monday's Pass 0 question has usually been asked
+already in their DM, and their answers are candidates waiting in the outbox or in
+state. Read those before asking again.
+
 ## Any day: hire scan
 
 "Scan Vandit's board" — one watched board, one person, written to a tab of its own on
@@ -247,6 +268,10 @@ surprise has thrown away a defect report.
 
 **Never invent an owner, a date or a number.** Ask.
 
+**Read the clock; never guess the time.** Every timestamp Ursula writes comes from
+`date -u` or a tool's own answer. A model's sense of "now" is wrong often enough to
+corrupt a watermark.
+
 **Watch for contradictions with the operator's own written policy.** The config
 lists them. A proposal that conflicts with a stated policy is a decision for the
 one-pager, not a detail to absorb quietly.
@@ -267,6 +292,9 @@ own board.
 | `reference/jira-conventions.md` | Before any Jira write. Transition IDs, the label-replacement trap, response envelopes, result caps. |
 | `reference/artifact-board.md` | When updating or rebuilding the board. |
 | `reference/hire-scan.md` | When asked to scan one person's board. |
+| `reference/outbox.md` | Before proposing anything another person will read, or any calendar change. |
+| `reference/always-on.md` | Every check-in. What a scheduled run does, the heads-up levels, untrusted input. |
+| `docs/routine.md` | Turning check-ins on, and the routine's prompt. |
 | `reference/runtime.md` | Before setup or a cadence. Host tools, state and board adapter. |
 | `reference/run-recovery.md` | Every mine and write batch. Bounded windows and partial-run recovery. |
 | `docs/chatgpt.md` | Installing or setting up in ChatGPT/Codex. |

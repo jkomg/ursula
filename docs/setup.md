@@ -12,10 +12,10 @@ Expect fifteen minutes.
 
 ## 1. Install
 
-Add the skill through the Skills menu in claude.ai. Run it there, not in Claude Code:
-the connectors are provisioned in claude.ai, and config, state and the board live in a
-claude.ai artifact that Claude Code cannot reach (`config/schema.md`). Claude Code is
-where the repo is edited, not where the skill runs.
+Add the skill through the Skills menu in claude.ai and run the Monday and Thursday
+sessions there: that is where you and your connectors are. Check-ins between sessions
+run as a cloud routine with the same connectors, and read and write the same board
+database (`docs/routine.md`). The repo is where the skill is edited.
 
 ## 2. Turn on connectors
 
@@ -111,6 +111,15 @@ the run is the core checks only.
 
 An existing artifact URL to adopt, or permission to publish a new one.
 
+### Heads-up
+
+How much the operator wants to hear between sessions: `quiet` (only what needs them),
+`daily` (a morning and an end-of-day note) or `chatty` (everything, with reasons). Ask
+in those words, not as config. Record it in `config/voice` with their own email address
+and the channel id of their Slack DM with themselves. Tell them they can change it any
+time from the board. Then offer to turn on check-ins (`docs/routine.md`); say plainly
+that each check-in uses some of their Claude allowance.
+
 ## 3b. Completion contract
 
 The interview is a conversation, not a script — but it is **done** only when every item
@@ -118,11 +127,14 @@ below is true. Claude must not report setup as complete otherwise.
 
 ### Required state
 
-Ten documents, every field populated or explicitly recorded as unknown with a reason:
+Eleven documents, every field populated or explicitly recorded as unknown with a reason:
 
 `config/jira` · `config/labels` · `config/cadence` · `config/numbers` ·
-`config/people` · `config/policies` · `config/packs` · `config/run` ·
+`config/people` · `config/policies` · `config/packs` · `config/run` · `config/voice` ·
 `state/watermark` · `state/ingested`
+
+`config/checkins` is written only when check-ins are turned on; its absence means they
+are off, which is a valid setup.
 
 A field left out silently is a failure. A field recorded as `null` with a note saying
 why is acceptable and gets reported.

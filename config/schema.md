@@ -64,6 +64,28 @@ and a ticket reference where one exists. Drives the policy-conflict check.
 A pack in `enabled` with its config missing is an incomplete setup, not a pack that
 runs on defaults.
 
+### `config/voice`
+
+How much the operator hears between sessions (`reference/always-on.md`, "Heads-up").
+**The board writes this document**, from the control on its Outbox tab; the interview
+only sets the starting value. It is the one config document the board may change.
+
+| Field | Notes |
+|---|---|
+| `level` | `quiet` (default) · `daily` · `chatty` |
+| `channels` | `{slack_dm: bool, email_self: bool}`. The board is always on. Defaults: both `true` |
+| `email` | The operator's own address, for email-to-self notices. The board also refuses to send a test to any other address |
+| `updated_at`, `updated_by` | Set by the board |
+
+### `config/checkins`
+
+| Field | Notes |
+|---|---|
+| `enabled` | `true` once the routine exists (`docs/routine.md`) |
+| `routine` | The routine's claude.ai link, so the operator can find it to pause it |
+| `schedule` | Human-readable, e.g. "weekdays 8am, noon, 4pm ET" |
+| `slack_dm` | The channel id of the operator's DM with themselves (a `D…` id) |
+
 ## State
 
 Operational, not configuration. Same database, `state` collection.
@@ -73,6 +95,14 @@ Operational, not configuration. Same database, `state` collection.
 | `state/watermark` | Timestamp of last successful mine. Only updated on success. |
 | `state/ingested` | Source document id to created issue keys. Prevents re-ingestion. |
 | `state/tagging` | Proposals and whether the operator accepted them. |
+| `state/checkin` | `watermark` (the check-ins' own, never the cadence's) and `slack_last_ts` (newest operator DM message read). Advanced only by a completed check-in. |
+
+### `outbox/<id>`
+
+Every proposed action another person will read, and every calendar change, with its
+approval and receipt. Written by sessions and check-ins; approved, sent and receipted by
+the board. The full field list and the rules are in `reference/outbox.md`; change them
+there first, then the board.
 
 Findings and the run log are **collections, one document each**, not single documents.
 The board's Findings and Log tabs read them, and a single growing document would hit
@@ -112,12 +142,14 @@ touches Jira for a finding; any ticket change is the session's, in the next Pass
 ### `runs/<date>-<session>`
 
 One document per session, id like `2026-09-28-plan`, `2026-10-01-retro`, `-adhoc` for
-anything between, `2026-09-29-hire-vandit` for a hire scan. The board shows the latest 52.
+anything between, `2026-09-29-hire-vandit` for a hire scan, `2026-10-01-checkin-1600` for a
+check-in. The board shows the latest 52 sessions and folds check-ins under the day they ran.
 
 | Field | Notes |
 |---|---|
 | `date` | ISO date. The board orders on it |
-| `session` | `plan` · `retro` · `adhoc` · `hire-scan` |
+| `session` | `plan` · `retro` · `adhoc` · `hire-scan` · `checkin` |
+| `time` | Check-ins only: local `HH:MM` the check-in ran, read from the clock |
 | `mode` | `dry-run` · `sandbox` · `live` |
 | `status` | `complete` · `partial` · `failed`. Only `complete` advances the watermark |
 | `summary` | One or two sentences |
@@ -179,12 +211,15 @@ write it.
 Shared rows are readable by anyone who can open the artifact. **Never store
 credentials, tokens or vault item names.** Cloud ids and project keys are fine.
 
-`config/run.prohibitions` holds the hard limits — no email, no Slack writes. Calendar
+`config/run.prohibitions` holds the hard limits — Ursula sends no email and no Slack
+message to anyone but the operator; everything else goes through the outbox. Calendar
 writes are permitted under the approval tiers in SKILL.md; `config/run.calendar` can
 lower that further per operator (for example, tier 1 only) but never raise it.
 
-Last-writer-wins, no transactions. Fine at twice a week; do not build anything that
-assumes atomicity.
+Last-writer-wins, no transactions. Fine at a few check-ins a day and two sessions a
+week; do not build anything that assumes atomicity. Pin a write to the version read
+(`if_version`) where the tool offers it, so a check-in and the board do not overwrite
+each other.
 
 Config is per-operator. Two operators watching the same boards have two separate
 configs and two separate databases. Jira is the only shared state.

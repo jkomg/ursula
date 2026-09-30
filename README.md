@@ -27,9 +27,12 @@ reference/
   jira-conventions.md         transition ids, label trap, response envelopes
   artifact-board.md           board structure and capabilities
   hire-scan.md                one person's board, as its own tab on the board
+  outbox.md                   proposals another person will read: approve on the board, receipts kept
+  always-on.md                check-ins between sessions, and how much the operator hears
 docs/
   setup.md                    the conversational install — start here
   cadence.md                  the weekly rhythm
+  routine.md                  turning on scheduled check-ins (a claude.ai cloud routine)
   troubleshooting.md          when connectors and queries misbehave
 config/
   schema.md                   what config and state hold
@@ -45,6 +48,12 @@ ChatGPT/Codex installation and setup: `docs/chatgpt.md`. Both hosts use the same
 cadence and checks. Claude has a live artifact board; ChatGPT/Codex has a portable,
 dated snapshot and private state files or an explicit export. The Python 3 helper
 `scripts/render_snapshot.py` can produce that snapshot for either host.
+
+Between sessions, a scheduled cloud routine runs short **check-ins**
+(`reference/always-on.md`): it reads the operator's Slack DM and new notes, stages
+findings, and puts anything that should reach another person in the **outbox**, where
+the operator approves it on the board and the board sends it and keeps the receipt
+(`reference/outbox.md`). How much the operator hears is theirs to set, quiet to chatty.
 
 Write batches now carry per-action receipts for resuming partial runs, and mining
 uses a frozen window so notes arriving during write-back are picked up next time
