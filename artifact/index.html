@@ -35,6 +35,9 @@
     font-size:15px;line-height:1.5}
   .wrap{max-width:920px;margin:0 auto;padding:28px 18px 80px}
   header{border-bottom:2px solid var(--ink);padding-bottom:14px}
+  .brand{display:flex;gap:14px;align-items:center}
+  .brand > div{min-width:0}
+  .mark{width:52px;height:52px;flex:none}
   .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700}
   h1{font-size:clamp(24px,5vw,34px);margin:6px 0 4px;letter-spacing:-.02em;line-height:1.1}
   .sub{color:var(--dim);font-size:13.5px;margin:0}
@@ -127,6 +130,44 @@
   .run ul{margin:6px 0 0;padding-left:18px;font-size:13.5px}
   .run .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-top:9px}
   .run.partial{border-left:3px solid var(--should)} .run.failed{border-left:3px solid var(--err)}
+  .hsum{margin:14px 0 0;font-size:14.5px}
+  .hmeta{font-size:12px;color:var(--dim);margin-top:6px}
+  .hmeta.old{color:var(--should)}
+  .hnums{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .hnums span{border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--dim);background:var(--panel)}
+  .hnums b{display:block;font-size:18px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .hnums span.hot b{color:var(--must)}
+  .hitem{display:flex;gap:10px;align-items:baseline;padding:9px 14px;border-bottom:1px solid var(--line);font-size:13.5px}
+  .hitem:last-child{border-bottom:0}
+  .hitem .tag{flex:none}
+  .hitem .why{color:var(--dim);font-size:12.5px}
+  .hitem > div{min-width:0;overflow-wrap:anywhere}
+  .agenda{margin:0;padding:10px 14px 10px 32px;font-size:14px}
+  .agenda li{margin:3px 0}
+  .voice{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+  .voice .move[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .voice label{font-size:12.5px;color:var(--dim);display:flex;gap:5px;align-items:center}
+  .vhelp{font-size:12.5px;color:var(--dim);margin:6px 0 0}
+  .banner{margin-top:14px;padding:9px 12px;border:1px dashed var(--should);border-radius:8px;color:var(--should);font-size:13px}
+  .obx{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:8px;padding:12px 14px;margin-bottom:9px}
+  .obx.closed{border-left-color:var(--line)}
+  .obx.closed .obody{opacity:.75}
+  .obx h4{margin:0;font-size:15px;overflow-wrap:anywhere}
+  .obx .to{font-size:13px;margin-top:4px;overflow-wrap:anywhere}
+  .obx .to b{font-weight:600}
+  .obx .why{font-size:12.5px;color:var(--dim);margin-top:4px}
+  .obody{white-space:pre-wrap;font-size:13.5px;background:var(--bg);border-radius:6px;padding:9px 11px;margin-top:8px;overflow-wrap:anywhere}
+  textarea.obody{width:100%;border:1px solid var(--line);color:var(--ink);font:inherit;font-size:13.5px;resize:vertical;min-height:90px}
+  .obx .rcpt{font-size:12px;color:var(--dim);margin-top:6px;overflow-wrap:anywhere}
+  .obx .acts{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);align-items:center}
+  .nt{border-top:1px solid var(--line);padding:9px 0 2px;font-size:13.5px}
+  .nt:first-child{border-top:0}
+  .nt .me{white-space:pre-wrap;overflow-wrap:anywhere}
+  .nt .u{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:5px;padding-left:10px;border-left:2px solid var(--accent);color:var(--ink)}
+  .nt .meta{font-size:11.5px;color:var(--dim);margin-top:3px}
+  #notes{margin-top:10px}
+  .run.checkin{padding:7px 14px;font-size:13px}
   footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px}
   @media(max-width:600px){ .top{flex-wrap:wrap} .st{order:3} .day{flex-wrap:wrap} .day b{flex-basis:100%}
     .fnd dl{grid-template-columns:1fr} .fnd dt{padding-top:6px} }
@@ -135,13 +176,36 @@
 <body>
 <div class="wrap">
 <header>
+  <div class="brand">
+  <svg class="mark" viewBox="0 0 64 64" role="img" aria-label="Ursula">
+    <title>Ursula</title>
+    <g fill="none" stroke="var(--accent)" stroke-width="4.5" stroke-linecap="round">
+      <path d="M20 37c-4 8-9 10-12 6"/>
+      <path d="M26 39c-1 9-5 14-10 13"/>
+      <path d="M32 40c0 8-1 13 2 15 2 1.5 4 0 3.5-2"/>
+      <path d="M38 39c1 9 5 14 10 13"/>
+      <path d="M45 35c6-2 10-8 10-15"/>
+    </g>
+    <path d="M32 6C19 6 12 15 12 25c0 7 4 12 9 14h22c5-2 9-7 9-14C52 15 45 6 32 6Z" fill="var(--accent)"/>
+    <ellipse cx="25" cy="25" rx="4.6" ry="5.4" fill="#fffdf9"/>
+    <ellipse cx="39" cy="25" rx="4.6" ry="5.4" fill="#fffdf9"/>
+    <circle cx="26.6" cy="26.2" r="2.3" fill="#20211f"/>
+    <circle cx="40.6" cy="26.2" r="2.3" fill="#20211f"/>
+    <path d="M28 33c2.2 1.6 5.8 1.6 8 0" fill="none" stroke="#fffdf9" stroke-width="2" stroke-linecap="round"/>
+    <path d="M51 11l3 3.2 6-7.4" fill="none" stroke="var(--done)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <div>
   <div class="eyebrow">Ursula</div>
   <h1 id="hdr">This week</h1>
-  <p class="sub">Your open work and your actual week, read live. Status changes write back; notes post as comments when you send them. Findings and the log are what each session recorded.</p>
+  </div>
+  </div>
+  <p class="sub">Your open work and your actual week, read live. Status changes write back; notes post as comments when you send them. Anything that would reach someone else waits in the Outbox for your OK. Findings and the log are what each session recorded.</p>
 </header>
 
 <nav class="tabs" role="tablist">
   <button role="tab" data-tab="week" aria-selected="true">This week</button>
+  <span id="hiretabs" style="display:contents"></span>
+  <button role="tab" data-tab="outbox" aria-selected="false">Outbox<span class="n" id="ocount"></span></button>
   <button role="tab" data-tab="findings" aria-selected="false">Findings<span class="n" id="fcount"></span></button>
   <button role="tab" data-tab="log" aria-selected="false">Log<span class="n" id="lcount"></span></button>
 </nav>
@@ -160,6 +224,30 @@
 </div>
 
 <div id="lanes"></div>
+</div>
+
+<div class="view" id="v-hire" hidden>
+  <div id="hire"></div>
+</div>
+
+<div class="view" id="v-outbox" hidden>
+  <div class="panel" style="padding:12px 14px">
+    <div class="eyebrow">Between sessions</div>
+    <div class="voice" id="voice"></div>
+    <p class="vhelp" id="vhelp"></p>
+    <div class="voice" id="vchan"></div>
+    <div class="sync" id="vstatus"></div>
+  </div>
+  <div class="panel" style="padding:12px 14px">
+    <div class="eyebrow">Tell Ursula</div>
+    <p class="vhelp">A to-do, a note from your notebook, a question. The next check-in picks it up and answers here.</p>
+    <textarea class="note" id="tell" rows="2" placeholder="e.g. Promised Vandit feedback on his runbook by Friday"></textarea>
+    <div class="row"><button class="push" id="tellsend">Send to Ursula</button><span class="sync" id="tellstatus"></span></div>
+    <div id="notes"></div>
+  </div>
+  <div id="obanner"></div>
+  <div id="ostatus" class="sync" style="margin-top:14px"></div>
+  <div id="outbox"></div>
 </div>
 
 <div class="view" id="v-findings" hidden>
@@ -182,6 +270,8 @@ const CFG = {
   JQL: 'assignee = currentUser() AND labels = "%LABEL%" ORDER BY duedate ASC, priority DESC',
   JIRA: "Atlassian",                     // connector display name
   GCAL: "Custom Google Drive",           // connector exposing google_calendar_events_list
+  GMAIL: "Custom Google Drive",          // connector exposing gws_gmail_send and gws_calendar_events_insert
+  SLACK: "Slack",                        // connector exposing slack_send_message
   DAY_START: 9, DAY_END: 18,             // working window for gap detection
   MIN_GAP: 45                            // minutes; shorter gaps aren't real work time
 };
@@ -208,6 +298,10 @@ function saveDoneOpen(){
 
 function setStatus(m, bad){ const s = $("status"); s.textContent = m || ""; s.className = bad ? "bad" : ""; }
 function errText(e){
+  // Atlassian's answer when the claude.ai connection has lapsed for the site. It has
+  // happened more than once; the fix is on the operator's side, so say what it is.
+  if(e && /not installed on this instance/i.test(String(e.message || e.detail || "")))
+    return "the Atlassian connection has lapsed — reconnect Atlassian in claude.ai Settings → Connectors, then reload";
   const m = {not_granted:"access not granted", server_not_connected:"connector not connected",
     not_in_manifest:"call outside approved scope", tool_error:"rejected by the service",
     rate_limited:"rate limited", cancelled:"cancelled",
@@ -616,16 +710,25 @@ function showDiagnostics(){
 }
 
 /* ---------- tabs ---------- */
-const TABS = ["week","findings","log"];
+const TABS = ["week","outbox","findings","log"];
+let currentTab = "week", wantedTab = "week";
 function showTab(t){
-  if(!TABS.includes(t)) t = "week";
+  wantedTab = t;
+  const hireSlug = /^hire:/.test(t) ? t.slice(5) : null;
+  if(hireSlug && !hires.some(h => h._id === hireSlug)) t = "week";   // not loaded yet, or gone
+  else if(!hireSlug && !TABS.includes(t)) t = "week";
+  currentTab = t;
   for(const b of document.querySelectorAll(".tabs button"))
     b.setAttribute("aria-selected", b.dataset.tab === t ? "true" : "false");
   for(const k of TABS) $("v-" + k).hidden = k !== t;
-  try{ localStorage.setItem("ursula.tab", t); }catch(e){}
+  $("v-hire").hidden = !hireSlug || t === "week";
+  if(hireSlug && t !== "week") renderHire(hireSlug);
+  try{ localStorage.setItem("ursula.tab", wantedTab); }catch(e){}
 }
-for(const b of document.querySelectorAll(".tabs button"))
-  b.addEventListener("click", () => showTab(b.dataset.tab));
+document.querySelector(".tabs").addEventListener("click", e => {
+  const b = e.target.closest("button[data-tab]");
+  if(b) showTab(b.dataset.tab);
+});
 
 /* ---------- findings and run log ----------
    Written by the Ursula session through ArtifactData, read here. Shapes are
@@ -762,6 +865,15 @@ function renderRuns(runs){
   }
   for(const r of runs){
     const st = str(r.status) || "complete";
+    if(r.session === "checkin"){
+      // Check-ins are frequent and small: one line each, problems still visible.
+      const c = el("article", "run checkin" + (st === "complete" ? "" : " " + st));
+      const cn = arr(r.could_not).map(str).filter(Boolean);
+      c.appendChild(el("span","", str(r.date).slice(0,10) + " · check-in " + str(r.time || "") +
+        " · " + (str(r.summary) || st) + (cn.length ? " · could not: " + cn.join("; ") : "")));
+      host.appendChild(c);
+      continue;
+    }
     const c = el("article", "run" + (st === "complete" ? "" : " " + st));
     const top = el("div","top");
     top.appendChild(el("b","", str(r.date).slice(0,10) + " · " + (str(r.session) || "session")));
@@ -806,7 +918,7 @@ function renderRuns(runs){
   }
 }
 
-let canWrite = null;
+let canWrite = null, viewerId = null;
 function watchRecords(){
   if(!db){
     $("fstatus").textContent = $("lstatus").textContent = "Database not available in this view.";
@@ -817,11 +929,417 @@ function watchRecords(){
     findings = snap.docs.map(d => Object.assign({_id: d.id}, d.data() || {}));
     $("fstatus").textContent = snap.metadata.fromCache ? "Refreshing…" : "";
     renderFindings();
+    renderHireTabs();
+    if(/^hire:/.test(currentTab)) renderHire(currentTab.slice(5));
   }, e => { $("fstatus").className = "sync bad"; $("fstatus").textContent = dbErr(e); });
-  db.collection("runs").orderBy("date","desc").limit(52).onSnapshot(snap => {
+  db.collection("runs").orderBy("date","desc").limit(150).onSnapshot(snap => {
     $("lstatus").textContent = snap.metadata.fromCache ? "Refreshing…" : "";
     renderRuns(snap.docs.map(d => d.data() || {}));
   }, e => { $("lstatus").className = "sync bad"; $("lstatus").textContent = dbErr(e); });
+}
+
+/* ---------- hire tabs ----------
+   One tab per document in `hires`, written by a hire scan (SKILL.md, "Hire scan").
+   The scan is the judgement, as of when it ran; the live list under it reads the
+   hire's board from Jira now, read-only, so the two can be compared. */
+let hires = [];
+const liveCache = {};             // slug -> {at, rows, capped} | {err}
+const KEY_RE = /^[A-Z][A-Z0-9_]{1,19}$/;   // project keys only — this goes into JQL
+function renderHireTabs(){
+  const host = $("hiretabs"); host.innerHTML = "";
+  for(const h of hires){
+    const b = el("button");
+    b.setAttribute("role","tab"); b.dataset.tab = "hire:" + h._id;
+    b.setAttribute("aria-selected", currentTab === b.dataset.tab ? "true" : "false");
+    b.textContent = str(h.name) || h._id;
+    const open = findings.filter(f => f.subject === h._id && OPEN.has(str(f.status) || "open")).length;
+    const hot = arr(h.needs_me).length + arr(h.blocked).length;
+    if(hot || open) b.appendChild(el("span","n", String(hot || open)));
+    host.appendChild(b);
+  }
+  if(wantedTab !== currentTab) showTab(wantedTab);    // restore a remembered hire tab once it exists
+}
+function ageDays(iso){
+  const t = Date.parse(str(iso));
+  return isNaN(t) ? null : Math.floor((Date.now() - t) / 86400000);
+}
+function itemList(title, items, why){
+  items = arr(items).filter(Boolean);
+  if(!items.length) return null;
+  const pnl = el("div","panel");
+  const h = el("h3","",title); h.appendChild(el("b","", String(items.length))); pnl.appendChild(h);
+  for(const it of items){
+    const row = el("div","hitem");
+    const url = str(it.url);
+    if(it.key){
+      if(/^https:\/\//.test(url)){ const a = el("a","tag key", str(it.key)); a.href = url; a.target = "_blank"; a.rel = "noopener"; row.appendChild(a); }
+      else row.appendChild(el("span","tag key", str(it.key)));
+    }
+    const body = el("div");
+    body.appendChild(el("div","", str(it.title)));
+    const w = why(it);
+    if(w) body.appendChild(el("div","why", w));
+    row.appendChild(body);
+    pnl.appendChild(row);
+  }
+  return pnl;
+}
+function renderHire(slug){
+  const h = hires.find(x => x._id === slug);
+  const host = $("hire"); host.innerHTML = "";
+  if(!h){ host.appendChild(el("div","empty","No scan recorded for this person.")); return; }
+
+  host.appendChild(el("h2","", (str(h.name) || slug) + (h.board ? " · " + str(h.board) : "")));
+  if(h.summary) host.appendChild(el("p","hsum", str(h.summary)));
+  const age = ageDays(h.scanned_at);
+  const meta = el("div", "hmeta" + (age !== null && age > 7 ? " old" : ""),
+    "Scanned " + (age === null ? "at an unknown time" : age === 0 ? "today" : age + (age === 1 ? " day" : " days") + " ago") +
+    (h.mode ? " · " + str(h.mode) : "") +
+    (age !== null && age > 7 ? " · older than a week — ask Claude for a fresh scan" : ""));
+  host.appendChild(meta);
+
+  const c = h.counts || {};
+  const nums = el("div","hnums");
+  for(const [k,label,hot] of [["open","open"],["blocked","blocked",1],["needs_review","needs review",1],["overdue","overdue",1],["done_since_last","done since last scan"]]){
+    if(c[k] === undefined || c[k] === null) continue;
+    const s = el("span", hot && Number(c[k]) > 0 ? "hot" : ""); s.appendChild(el("b","",str(c[k]))); s.appendChild(document.createTextNode(label));
+    nums.appendChild(s);
+  }
+  if(nums.childNodes.length) host.appendChild(nums);
+
+  const lists = [
+    itemList("Waiting on you", h.needs_me, it => str(it.why)),
+    itemList("Blocked", h.blocked, it => [it.on_whom ? "on " + str(it.on_whom) : "", it.since ? "since " + str(it.since).slice(0,10) : ""].filter(Boolean).join(" · ")),
+    itemList("Flagged for review", h.needs_review, it => str(it.why)),
+    itemList("Overdue", h.overdue, it => it.due ? "due " + str(it.due).slice(0,10) : ""),
+    itemList("Moved since last scan", h.moved, it => str(it.change))
+  ];
+  for(const l of lists) if(l) host.appendChild(l);
+
+  const agenda = arr(h.agenda).map(str).filter(Boolean);
+  if(agenda.length){
+    const pnl = el("div","panel"); pnl.appendChild(el("h3","","For the one-to-one"));
+    const ol = el("ol","agenda"); for(const a of agenda) ol.appendChild(el("li","",a));
+    pnl.appendChild(ol); host.appendChild(pnl);
+  }
+
+  const mine = findings.filter(f => f.subject === slug && OPEN.has(str(f.status) || "open"));
+  if(mine.length){
+    host.appendChild(el("h2","","Findings"));
+    for(const f of mine) host.appendChild(findingCard(f));
+  }
+
+  const could = arr(h.could_not).map(str).filter(Boolean);
+  if(could.length){
+    const pnl = el("div","panel"); pnl.appendChild(el("h3","","Could not be done"));
+    const ul = el("ul","agenda"); for(const x of could) ul.appendChild(el("li","",x));
+    pnl.appendChild(ul); host.appendChild(pnl);
+  } else if(!Array.isArray(h.could_not)){
+    host.appendChild(el("div","sync bad","Not recorded: could-not list"));
+  }
+
+  const live = el("div"); host.appendChild(live);
+  renderLive(h, live);
+}
+async function renderLive(h, host){
+  const slug = h._id;
+  const key = str(h.board);
+  host.innerHTML = "";
+  const pnl = el("div","panel");
+  const head = el("h3","","Their board now");
+  const note = el("b","","");
+  head.appendChild(note); pnl.appendChild(head); host.appendChild(pnl);
+  if(!KEY_RE.test(key)){ note.textContent = "no board key on the scan"; return; }
+  if(!mcp){ note.textContent = "live view needs the Jira connector"; return; }
+  let r = liveCache[slug];
+  if(r && r.pending){ note.textContent = "reading " + key + "…"; return; }
+  if(!r){
+    note.textContent = "reading " + key + "…";
+    liveCache[slug] = {pending: true};
+    try{
+      if(!cloudId) cloudId = await resolveCloudId();
+      const p = unwrap(await call(CFG.JIRA, "searchJiraIssuesUsingJql", {
+        cloudId, maxResults: 100,
+        jql: "project = " + key + " AND statusCategory != Done ORDER BY duedate ASC, priority DESC",
+        fields: ["summary","status","priority","duedate","labels"]
+      }));
+      raiseIfServiceError(p);
+      const rows = listOf(p && p.issues) || listOf(p);
+      if(!rows) throw {code:"bad_shape"};
+      r = liveCache[slug] = {at: new Date(), rows: rows.filter(x => x && x.key && x.fields)};
+    }catch(e){
+      r = liveCache[slug] = {err: errText(e)};
+    }
+    // Re-render rather than finish here: the scan may have re-rendered meanwhile,
+    // and this host may no longer be on the page.
+    if(currentTab === "hire:" + slug) renderHire(slug);
+    return;
+  }
+  if(r.err){ note.textContent = "couldn't read " + key + ": " + r.err; return; }
+  // 100 back means the cap, not the total (reference/jira-conventions.md).
+  note.textContent = r.rows.length + (r.rows.length >= 100 ? "+ open — capped, not the total" : " open") + " · read " + hhmm(r.at);
+  const scannedKeys = new Set([].concat(arr(h.needs_me), arr(h.blocked), arr(h.needs_review), arr(h.overdue)).map(x => x && x.key));
+  const today = ymd(new Date());
+  for(const iss of r.rows){
+    const f = iss.fields;
+    const row = el("div","hitem");
+    const a = el("a","tag key", iss.key);
+    a.href = iss.webUrl || ((iss.self || "").split("/rest/")[0] + "/browse/" + iss.key); a.target = "_blank"; a.rel = "noopener";
+    row.appendChild(a);
+    const body = el("div");
+    body.appendChild(el("div","", str(f.summary)));
+    const bits = [str(f.status && f.status.name)];
+    if(f.duedate) bits.push((f.duedate < today ? "overdue " : "due ") + f.duedate);
+    if(arr(f.labels).includes("needs-review")) bits.push("needs-review");
+    if(scannedKeys.has(iss.key)) bits.push("in the scan");
+    body.appendChild(el("div","why", bits.filter(Boolean).join(" · ")));
+    row.appendChild(body);
+    pnl.appendChild(row);
+  }
+}
+function watchHires(){
+  if(!db) return;
+  db.collection("hires").orderBy("name").onSnapshot(snap => {
+    hires = snap.docs.map(d => Object.assign({_id: d.id}, d.data() || {}));
+    renderHireTabs();
+    if(/^hire:/.test(currentTab)) renderHire(currentTab.slice(5));
+  }, () => {});
+}
+
+/* ---------- outbox ----------
+   Proposals written by sessions and check-ins; this page approves, sends and keeps
+   the receipt. Rules and fields: reference/outbox.md. The page sends nothing for a
+   dry-run item, for an item proposed in another mode than the current one, or for an
+   expired one. Bodies are shared data: textContent only. */
+let outbox = [], runMode = null, voice = null, showDecided = false;
+const OPEN_OB = new Set(["proposed"]);
+const KIND = {email:"Email", slack:"Slack message", jira_comment:"Jira comment", calendar_block:"Focus block"};
+const LEVELS = [
+  ["quiet","Quiet","Only when something needs your OK, or a serious finding. No findings, no messages."],
+  ["daily","Daily","Quiet, plus a morning note and an end-of-day note of what was handled."],
+  ["chatty","Chatty","Every check-in reports what it read, matched, skipped and why."]
+];
+const nowIso = () => new Date().toISOString();
+const expired = o => o.expires_at && Date.parse(o.expires_at) < Date.now();
+
+function payloadOf(r){
+  if(r && r.payload !== undefined && r.payload !== null) return r.payload;
+  if(r && r.structuredContent) return r.structuredContent;
+  const t = r && Array.isArray(r.content) ? (r.content.find(c => c.type === "text") || {}).text : null;
+  if(t){ try{ return JSON.parse(t); }catch(e){ return {text: t}; } }
+  return r;
+}
+async function send(o, body){
+  const t = o.target || {};
+  if(o.kind === "email"){
+    const p = payloadOf(await mcp.callTool(CFG.GMAIL, "gws_gmail_send",
+      {args: ["--to", str(o.to), "--subject", str(o.subject), "--body", body]}));
+    if(!p || !p.id) throw {code:"bad_shape", detail:"Gmail answered without a message id"};
+    return {id: p.id, threadId: p.threadId || null};
+  }
+  if(o.kind === "slack"){
+    const p = payloadOf(await mcp.callTool(CFG.SLACK, "slack_send_message", {channel_id: str(o.to), message: body}));
+    return {text: str(p && (p.text || JSON.stringify(p))).slice(0, 300)};
+  }
+  if(o.kind === "jira_comment"){
+    if(!cloudId) cloudId = await resolveCloudId();
+    const p = unwrap(await call(CFG.JIRA, "addCommentToJiraIssue", {cloudId, issueIdOrKey: str(t.key || o.target), commentBody: body}));
+    return {issue: str(t.key || o.target), id: p && p.id ? String(p.id) : null};
+  }
+  if(o.kind === "calendar_block"){
+    const p = payloadOf(await mcp.callTool(CFG.GMAIL, "gws_calendar_events_insert", {
+      params: {calendarId: "primary"},
+      json: {summary: str(t.title) || "Focus", start: {dateTime: str(t.start)}, end: {dateTime: str(t.end)}, transparency: "opaque"}}));
+    if(!p || !p.id) throw {code:"bad_shape", detail:"Calendar answered without an event id"};
+    return {id: p.id, link: p.htmlLink || null};
+  }
+  throw {code:"bad_request", detail:"unknown kind " + str(o.kind)};
+}
+function whyNot(o){
+  if(runMode === null) return "Checking the run mode…";
+  if(o.mode === "dry-run" || runMode === "dry-run") return "Dry run: nothing sends. Mark whether it is right.";
+  if(runMode && o.mode && o.mode !== runMode) return "Proposed in " + o.mode + " mode; Ursula is now in " + runMode + ". Not sent.";
+  if(expired(o)) return "Expired " + str(o.expires_at).slice(0,16).replace("T"," ") + ". Not sent.";
+  if(!mcp) return "No connector access in this view.";
+  return null;
+}
+function obCard(o){
+  const status = str(o.status) || "proposed";
+  const open = OPEN_OB.has(status);
+  const c = el("article", "obx" + (open ? "" : " closed"));
+  c.appendChild(el("h4","", (KIND[o.kind] || str(o.kind)) + (o.subject ? " · " + str(o.subject) : "")));
+  const to = el("div","to");
+  const t = o.target || {};
+  const who = o.kind === "jira_comment" ? "on " + str(t.key || o.target)
+    : o.kind === "calendar_block" ? str(t.start).replace("T"," ").slice(0,16) + " – " + str(t.end).slice(11,16) + " on your calendar"
+    : "to " + (str(o.to_label) || str(o.to));
+  to.appendChild(el("b","", who));
+  c.appendChild(to);
+  if(o.why) c.appendChild(el("div","why", str(o.why)));
+  const tg = el("div","tags");
+  tg.appendChild(el("span","tag" + (open ? " due" : ""), status));
+  if(o.mode) tg.appendChild(el("span","tag", str(o.mode)));
+  tg.appendChild(el("span","tag", "from " + (str(o.proposed_by) || "?") + " " + str(o.proposed_at).slice(0,16).replace("T"," ")));
+  for(const r of arr(o.refs)){
+    const url = str(r && r.url);
+    if(/^https:\/\//.test(url)){ const a = el("a","tag", str(r.label) || url); a.href = url; a.target = "_blank"; a.rel = "noopener"; tg.appendChild(a); }
+  }
+  c.appendChild(tg);
+
+  const blocked = open ? whyNot(o) : null;
+  const dry = open && (o.mode === "dry-run" || runMode === "dry-run");
+  let box;
+  if(open && !blocked && o.kind !== "calendar_block"){ box = el("textarea","obody"); box.value = str(o.body); }
+  else box = el("div","obody", str(o.body) || (o.kind === "calendar_block" ? str(t.title) : ""));
+  if(o.body || o.kind === "calendar_block") c.appendChild(box);
+
+  const rc = [];
+  if(o.approved_at) rc.push("approved " + str(o.approved_at).slice(0,16).replace("T"," ") + (o.edited ? " (you edited it)" : ""));
+  if(o.sent_at) rc.push("sent " + str(o.sent_at).slice(0,16).replace("T"," "));
+  if(o.receipt) rc.push("receipt " + Object.entries(o.receipt).filter(([,v]) => v).map(([k,v]) => k + " " + v).join(", "));
+  if(o.verdict) rc.push("dry-run verdict: " + str(o.verdict));
+  if(o.reject_note) rc.push("rejected: " + str(o.reject_note));
+  if(o.error) rc.push(str(o.error));
+  if(rc.length) c.appendChild(el("div","rcpt", rc.join(" · ")));
+
+  if(open && db && canWrite !== false){
+    const acts = el("div","acts"); const sync = el("span","sync");
+    const ref = db.doc("outbox/" + o._id);
+    const lock = on => Array.from(acts.querySelectorAll("button")).forEach(b => b.disabled = on);
+    const fail = (e, what) => { sync.className = "sync bad"; sync.textContent = what + " — " + (e && e.code ? errText(e) : dbErr(e)); lock(false); };
+    if(dry){
+      for(const [label, verdict] of [["Right","right"],["Wrong","wrong"]]){
+        const b = el("button","move",label);
+        b.addEventListener("click", async () => {
+          lock(true);
+          try{ await ref.update({status:"reviewed", verdict, reviewed_at: nowIso(), reviewed_by: viewerId}); }
+          catch(e){ fail(e, "Not saved"); }
+        });
+        acts.appendChild(b);
+      }
+    } else if(!blocked){
+      const go = el("button","push", o.kind === "calendar_block" ? "Approve and add" : "Approve and send");
+      go.addEventListener("click", async () => {
+        lock(true);
+        const body = box.tagName === "TEXTAREA" ? box.value : str(o.body);
+        const edited = box.tagName === "TEXTAREA" && body !== str(o.body);
+        // Record the approval first: if that fails, nothing is sent.
+        try{
+          await ref.update(Object.assign({status:"approved", approved_at: nowIso(), approved_by: viewerId, edited},
+            edited ? {original_body: str(o.body), body} : {}));
+        }catch(e){ fail(e, "Approval not saved, nothing sent"); return; }
+        sync.className = "sync"; sync.textContent = "Sending…";
+        try{
+          const receipt = await send(o, body);
+          await ref.update({status:"sent", sent_at: nowIso(), receipt});
+        }catch(e){
+          const c2 = e && e.code;
+          // No reply in time is not proof it did not go: say so, and block a blind retry.
+          const unknown = c2 === "server_unavailable" || c2 === "upstream_error";
+          await ref.update({status: unknown ? "unknown" : "failed",
+            error: (unknown ? "Outcome unknown — check before sending again: " : "Not sent: ") + errText(e)}).catch(() => {});
+        }
+      });
+      acts.appendChild(go);
+    } else {
+      acts.appendChild(el("span","sync", blocked));
+    }
+    const no = el("button","move","Reject");
+    const why = el("textarea","note"); why.rows = 1; why.placeholder = "Why not (optional) — Ursula reads this"; why.style.display = "none";
+    no.addEventListener("click", async () => {
+      if(why.style.display === "none"){ why.style.display = ""; why.focus(); no.textContent = "Confirm reject"; return; }
+      lock(true);
+      try{ await ref.update({status:"rejected", rejected_at: nowIso(), rejected_by: viewerId, reject_note: why.value.trim() || null}); }
+      catch(e){ fail(e, "Not saved"); }
+    });
+    if(!dry) acts.appendChild(no);
+    acts.appendChild(sync); acts.appendChild(why);
+    c.appendChild(acts);
+  }
+  return c;
+}
+function renderOutbox(){
+  const host = $("outbox"); host.innerHTML = "";
+  $("obanner").innerHTML = "";
+  if(runMode === "dry-run") $("obanner").appendChild(el("div","banner","Dry run: proposals show here but nothing sends. Mark each one right or wrong; that is how Ursula learns what you would send."));
+  const open = outbox.filter(o => OPEN_OB.has(str(o.status) || "proposed"));
+  const done = outbox.filter(o => !OPEN_OB.has(str(o.status) || "proposed"));
+  $("ocount").textContent = open.length ? String(open.length) : "";
+  if(!outbox.length){ host.appendChild(el("div","empty","Nothing proposed yet. When Ursula wants to send, add or book something for you, it waits here for your OK.")); return; }
+  const h1 = el("h2","", "Needs your OK"); h1.appendChild(el("em","", open.length ? String(open.length) : "nothing waiting"));
+  host.appendChild(h1);
+  for(const o of open) host.appendChild(obCard(o));
+  if(done.length){
+    const h = el("h2"); h.style.cursor = "pointer"; h.style.color = "var(--dim)"; h.textContent = "Sent and decided";
+    h.appendChild(el("em","", done.length + (showDecided ? " · click to hide" : " · click to show")));
+    h.addEventListener("click", () => { showDecided = !showDecided; renderOutbox(); });
+    host.appendChild(h);
+    if(showDecided) for(const o of done) host.appendChild(obCard(o));
+  }
+}
+function renderVoice(){
+  const cur = (voice && voice.level) || "quiet";
+  const host = $("voice"); host.innerHTML = "";
+  host.appendChild(el("span","sync","How much you hear:"));
+  for(const [k, label] of LEVELS){
+    const b = el("button","move",label); b.setAttribute("aria-pressed", k === cur ? "true" : "false");
+    b.disabled = !db || canWrite === false;
+    b.addEventListener("click", () => saveVoice({level: k}));
+    host.appendChild(b);
+  }
+  $("vhelp").textContent = (LEVELS.find(l => l[0] === cur) || LEVELS[0])[2];
+  const vc = $("vchan"); vc.innerHTML = "";
+  vc.appendChild(el("span","sync","Ursula reaches you through the check-in routine's own notification, sent by Claude to your phone and inbox. Turn it on in the routine's Notifications tab."));
+}
+async function saveVoice(patch){
+  $("vstatus").className = "sync"; $("vstatus").textContent = "Saving…";
+  try{
+    const ref = db.doc("config/voice");
+    const next = Object.assign({updated_at: nowIso(), updated_by: viewerId}, patch);
+    if(voice) await ref.update(next); else await ref.set(Object.assign({level:"quiet", channels:{slack_dm:false}}, next));
+    $("vstatus").className = "sync ok"; $("vstatus").textContent = "Saved. The next check-in uses it.";
+  }catch(e){ $("vstatus").className = "sync bad"; $("vstatus").textContent = "Not saved — " + dbErr(e); }
+}
+/* ---------- notes to Ursula ----------
+   The operator's side of the conversation. Check-ins and sessions read `notes`
+   with status "new", act, and write `reply` (reference/always-on.md, pass 1). */
+let notes = [];
+function renderNotes(){
+  const host = $("notes"); host.innerHTML = "";
+  for(const n of notes.slice(0, 12)){
+    const d = el("div","nt");
+    d.appendChild(el("div","me", str(n.text)));
+    if(n.reply) d.appendChild(el("div","u", str(n.reply)));
+    const when = str(n.at).slice(0,16).replace("T"," ");
+    d.appendChild(el("div","meta", when + " · " + (n.status === "new" ? "waiting for the next check-in" : n.reply ? "answered " + str(n.replied_at).slice(0,16).replace("T"," ") : "read")));
+    host.appendChild(d);
+  }
+}
+async function sendNote(){
+  const t = ($("tell").value || "").trim();
+  if(!t || !db) return;
+  $("tellsend").disabled = true; $("tellstatus").className = "sync"; $("tellstatus").textContent = "Sending…";
+  try{
+    await db.collection("notes").doc("board-" + Date.now()).set({text: t, from: viewerId, at: nowIso(), status: "new"});
+    $("tell").value = ""; $("tellstatus").className = "sync ok"; $("tellstatus").textContent = "Sent. The next check-in answers here.";
+  }catch(e){ $("tellstatus").className = "sync bad"; $("tellstatus").textContent = "Not sent — " + dbErr(e); }
+  $("tellsend").disabled = false;
+}
+
+function watchOutbox(){
+  if(!db){ $("ostatus").textContent = "Database not available in this view."; renderOutbox(); renderVoice(); return; }
+  db.doc("config/run").onSnapshot(s => { runMode = s.exists ? str((s.data() || {}).mode) || "dry-run" : "dry-run"; renderOutbox(); }, () => {});
+  $("tellsend").addEventListener("click", sendNote);
+  db.collection("notes").orderBy("at","desc").limit(30).onSnapshot(snap => {
+    notes = snap.docs.map(d => Object.assign({_id: d.id}, d.data() || {}));
+    renderNotes();
+  }, () => {});
+  db.doc("config/voice").onSnapshot(s => { voice = s.exists ? s.data() : null; renderVoice(); }, () => {});
+  db.collection("outbox").orderBy("proposed_at","desc").limit(200).onSnapshot(snap => {
+    outbox = snap.docs.map(d => Object.assign({_id: d.id}, d.data() || {}));
+    $("ostatus").textContent = snap.metadata.fromCache ? "Refreshing…" : "";
+    renderOutbox();
+  }, e => { $("ostatus").className = "sync bad"; $("ostatus").textContent = dbErr(e); });
 }
 
 /* ---------- local note drafts ---------- */
@@ -849,11 +1367,15 @@ async function saveDrafts(){
   }catch(e){}
   try{
     const u = await claude.use("user");
-    if(u) canWrite = await u.can("data.write");
+    if(u){ canWrite = await u.can("data.write"); viewerId = await u.id(); }
   }catch(e){}
   watchRecords();
+  watchHires();
+  watchOutbox();
 
   mcp = await claude.use("mcp");
+  renderOutbox();
+  if(mcp && /^hire:/.test(currentTab)) renderHire(currentTab.slice(5));
   if(!mcp){ setStatus("No connector access — this page can't reach Jira or Calendar from here.", true); return; }
 
   try{

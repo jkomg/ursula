@@ -2,6 +2,10 @@
 
 Read this first. `docs/setup.md` has the detail; this is the short version.
 
+**Using ChatGPT or Codex?** Use the OpenAI bundle and follow `docs/chatgpt.md`.
+The shared interview and cadence apply; connector and board instructions on this
+page describe the Claude installation. The OpenAI board is a dated snapshot.
+
 ## What it is
 
 A weekly operating harness. Twice a week you sit down with Claude: Monday it sweeps
@@ -80,9 +84,10 @@ is the part people skip and later wish they hadn't.
 
 Setup puts you there and you should stay there for two full weeks.
 
-Dry-run reads everything real and **writes nothing**. It shows you every ticket it
-would create, every field it would change, every tag it would suggest. Read those lists
-and see whether you'd have approved them.
+Dry-run reads everything real and **writes nothing to Jira or your calendar**. It
+shows you every ticket it would create, every field it would change, every tag it
+would suggest. Read those lists and see whether you'd have approved them. Its findings
+and run log still land on your board, so you can see what the checks caught.
 
 Switch to `live` when two runs in a row look right.
 

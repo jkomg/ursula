@@ -33,6 +33,11 @@ Thursday night, the retro is Thursday early afternoon.
 
 ## Between sessions
 
+With check-ins on (`docs/routine.md`), a routine does the between-session work a few
+times a day: it reads the operator's DM, mines what arrived, stages findings and puts
+anything that should happen in the outbox for approval. `reference/always-on.md` is the
+procedure. Without check-ins, the same practice is manual, and it is this:
+
 The continuous practice is staging. A finding on Tuesday becomes a comment on the
 one-pager's ticket on Tuesday, under the section it belongs to. Thursday is then
 assembly, not recall.
@@ -46,8 +51,11 @@ If a recurring call with the manager and the reports sits near the retro, run th
 blocked sweep **the night before** rather than the morning of. Nobody should first
 hear about a blocker in that call if it has been sitting since Monday.
 
-The same sweep, filtered to one person, is the prep for their one-to-one. Nearly
-free once the first exists.
+The same sweep, filtered to one person, is the prep for their one-to-one — a **hire
+scan**. Ask for it Monday or Tuesday morning, before the week's one-to-ones: "scan
+Vandit's board". It lands as that person's tab on the board, and the tab reads their
+board live when opened, so it stays useful through the week. See
+`reference/hire-scan.md`.
 
 ## Adjusting
 

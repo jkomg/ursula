@@ -1,5 +1,9 @@
 # Setup
 
+For ChatGPT/Codex, first read `docs/chatgpt.md` and `reference/runtime.md`.
+They replace the Claude installation, persistence and board publication steps below;
+the interview and real connector checks remain shared.
+
 Ursula is configured by conversation, not by editing files. Clone the repo, install
 the skill, then talk to Claude. Claude asks the questions below, writes the answers
 into your artifact database, and publishes your board.
@@ -8,10 +12,10 @@ Expect fifteen minutes.
 
 ## 1. Install
 
-Add the skill through the Skills menu in claude.ai. Run it there, not in Claude Code:
-the connectors are provisioned in claude.ai, and config, state and the board live in a
-claude.ai artifact that Claude Code cannot reach (`config/schema.md`). Claude Code is
-where the repo is edited, not where the skill runs.
+Add the skill through the Skills menu in claude.ai and run the Monday and Thursday
+sessions there: that is where you and your connectors are. Check-ins between sessions
+run as a cloud routine with the same connectors, and read and write the same board
+database (`docs/routine.md`). The repo is where the skill is edited.
 
 ## 2. Turn on connectors
 
@@ -107,6 +111,14 @@ the run is the core checks only.
 
 An existing artifact URL to adopt, or permission to publish a new one.
 
+### Heads-up
+
+How much the operator wants to hear between sessions: `quiet` (only what needs them),
+`daily` (a morning and an end-of-day note) or `chatty` (everything, with reasons). Ask
+in those words, not as config. Record it in `config/voice`. Tell them they can change it any
+time from the board. Then offer to turn on check-ins (`docs/routine.md`); say plainly
+that each check-in uses some of their Claude allowance.
+
 ## 3b. Completion contract
 
 The interview is a conversation, not a script — but it is **done** only when every item
@@ -114,11 +126,14 @@ below is true. Claude must not report setup as complete otherwise.
 
 ### Required state
 
-Ten documents, every field populated or explicitly recorded as unknown with a reason:
+Eleven documents, every field populated or explicitly recorded as unknown with a reason:
 
 `config/jira` · `config/labels` · `config/cadence` · `config/numbers` ·
-`config/people` · `config/policies` · `config/packs` · `config/run` ·
+`config/people` · `config/policies` · `config/packs` · `config/run` · `config/voice` ·
 `state/watermark` · `state/ingested`
+
+`config/checkins` is written only when check-ins are turned on; its absence means they
+are off, which is a valid setup.
 
 A field left out silently is a failure. A field recorded as `null` with a note saying
 why is acceptable and gets reported.
@@ -170,14 +185,16 @@ The first planning session is the real acceptance test. Rough shape, from measur
 - **Skip rate** — roughly half of extracted candidates should already have tickets. A
   run creating everything it finds is not reconciling.
 - **Findings** — at least two or three from the core checks and enabled packs, with evidence and a
-  recommendation each. **Zero findings means the analysis pass did not run.** That is
-  the single clearest sign of a lazy run, because the checks are the point.
+  recommendation each. **Zero findings is a red flag**, and the run is treated as
+  having skipped the analysis unless it shows, per check, that the check ran and
+  what evidence it ran against. Never manufacture a finding to reach a count; a
+  clean check with its evidence shown is the honest answer.
 - **Tag proposals** — ranked, with a recommendation on each, and the operator rejecting
   a good number of them.
 - **What it could not do** — stated explicitly. Every run ends with this, even when the
   answer is nothing.
 
-A run that produces tidy tickets, no coverage list and no findings has done the easy
+A run that produces tidy tickets, no coverage list and no recorded analysis has done the easy
 half and should be called out as such rather than accepted.
 
 ## 4. First run

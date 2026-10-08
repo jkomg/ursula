@@ -192,3 +192,89 @@ against stub data only; the tabs have not been opened against a real database.
 | # | Defect | Fix |
 |---|---|---|
 | 13 | The board read saved note drafts as `snapshot.data.drafts`. `data` is a function in the db contract, so drafts were written on every keystroke and never read back — a reload lost them. | Call `data()` and check `exists`. Found reading the runtime type definitions, not in a run; confirm drafts survive a reload on first use. |
+
+## 2026-09-29 — hire scan and hire tabs (no run)
+
+New: "scan <person>'s board" writes `hires/<slug>` and the board shows one tab per hire
+(`reference/hire-scan.md`). Checked locally against stub data only: tabs appear per
+document, a remembered hire tab survives reload, the live Jira read runs once per page
+load, and a board key that is not a plain project key is refused before it reaches JQL.
+
+Not yet exercised: a real scan writing the document, and the tab against a real board.
+The first real scan should confirm `resolved >= <date>` works as the *moved* query on a
+watched project, and that the notes-document search finds one-to-one notes for the
+person being scanned.
+
+## 2026-09-30 — ChatGPT/Codex adapter and shared recovery (no live run)
+
+One shared skill now selects a host adapter (`reference/runtime.md`). Claude keeps
+its native database/live board; ChatGPT/Codex uses private JSON state or an explicit
+export, with a dated snapshot. `docs/chatgpt.md` provides installation and setup.
+`bin/install.sh --target all` builds host-labelled bundles; the default remains Claude.
+
+Shared improvements: freeze mining window bounds, retain approved action receipts,
+re-read fields before edits, and reconcile unknown create outcomes before retrying
+(`reference/run-recovery.md`). Corrected contradictory dry-run guidance: staging
+comments and hire records are proposals only. Sandbox calendar changes stay proposals
+and sandbox progress cannot advance live ingestion state. Zero findings is valid
+with executed checks and complete evidence; never invent findings to satisfy a count.
+
+Actual local validation: five portable-renderer tests passed (required review output,
+incomplete records, escaping/unsafe links, invalid inputs, preserving an existing
+board after a failed render). Packaging checks passed for both hosts, newly created
+output directories with spaces, correct HOST metadata, included helpers, omitted
+bytecode caches, duplicate-build refusal and invalid targets. Skill frontmatter,
+references and shell syntax passed. These checks exercise real executable code,
+not connectors or cadence judgement. A fictional preview is in ignored `dist/preview/`.
+Browser visual inspection was unavailable because the browser tool blocks local
+file URLs; no visual verification is claimed.
+
+Still unproven: OpenAI skill installation in an operator's host, the configured
+connector translations, persistent state round-trips in that host, and recovery
+after a real partially applied batch. Acceptance requires a fresh setup and dry-run
+on each host. No live Jira, Calendar or database writes were made for this change.
+
+## 2026-09-30 — operator guide for a mixed audience (documentation only)
+
+Rewrote `docs/chatgpt.md` for managers and other non-technical staff, including
+Windows and Mac users. Explained dry-run, saved handover files and dated boards
+without database terminology. Moved command-line installation and rendering details
+to the maintainer section of `docs/release.md`. Packaging reference checks passed;
+no application installation or live cadence was tested for this documentation edit.
+
+## 2026-09-30 — dry-run keeps the operator's own record (documentation only)
+
+Review of the adapter batch above found it had made dry-run write nothing at all,
+including the run log, findings and hire scans, which contradicted the queued test
+plan (dry-run a session, confirm the Findings, Log and hire tabs fill) and would have
+left the board empty for the two cadences an operator spends in dry-run. Corrected in
+`SKILL.md`, `docs/sandbox.md`, `reference/run-recovery.md` and `reference/hire-scan.md`:
+dry-run writes nothing to Jira or Calendar and posts no staging comment, but does
+record `runs/`, `findings/` and `hires/` marked `mode: dry-run`, and does not advance
+the watermark or ingested map. Zero-findings wording in `docs/setup.md` and `README.md`
+restored to a red flag that must be argued away per check, keeping the rule against
+manufacturing findings. Also: `bin/install.sh --help` no longer prints a stray script
+line, the secret scan reports `file:line` without the value, and `docs/release.md`
+records the working test command. No run.
+
+
+## 2026-09-30 — always-on spike (`spike/FINDINGS.md`)
+
+Proved from a one-off cloud routine: writing the board database, a Slack DM to the
+operator, and propose → approve on the board → Gmail send with the receipt kept
+(gmail id `1a0f35c7d34a10a0`). Defects found and fixed in this change:
+
+- **Invented timestamps.** The routine wrote a midnight time and one later than the
+  store's own write. Fix: every time comes from `date -u` (SKILL.md working rules,
+  `reference/always-on.md`).
+- **Thread-only reply read.** Both operator replies went into the DM, not the thread,
+  and a thread read found none. Fix: check-ins read the whole DM since
+  `state/checkin.slack_last_ts`, no prefix or threading required.
+- **Slack DM does not notify.** The connector posts as the operator, so their own DM
+  raises no alert. Fix: the DM is the record and reply channel; the interrupt is email
+  to the operator's own address. Not yet confirmed that email alerts.
+- **Superseded the same day:** the interrupt is now the routine's own notification
+  ("Notify me when this routine finishes": push and email from Claude). The check-in's
+  final line is the notification. Email-to-self and the Slack DM log are optional and
+  need the guard settings on the routine's environment; without them every connector
+  write is blocked, confirmed on the first check-in (`guard: active`, cloud: true).

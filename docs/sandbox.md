@@ -1,9 +1,11 @@
 # Testing and sandboxing
 
-Only one thing in Ursula has side effects: **Jira writes.** Mining reads from Drive,
-Gmail and Calendar mutate nothing, and the artifact is per-operator by construction.
-So isolation is a question about writes, not about the whole pipeline — which is
+Three things in Ursula have side effects other people can see: **Jira writes,
+Calendar writes, and messages sent from the outbox.** Mining is read-only, and the run log, findings and hire scans go
+to the operator's own private store, which nobody else reads. So isolation is a
+question about Jira and Calendar writes, not about the whole pipeline — which is
 lucky, because the pipeline is exactly what you want to test against real data.
+Modes apply across both hosts.
 
 ## Three modes
 
@@ -11,9 +13,17 @@ Set in `config/run`.
 
 ### `dry-run` — the default for a new install
 
-Reads everything real. Writes nothing. Emits a changeset: every ticket it would
-create with full body, every field it would change with before and after, every
-comment it would post, every tag it would propose.
+Reads everything real. Writes nothing to Jira or Calendar. Emits a changeset: every
+ticket it would create with full body, every field it would change with before and
+after, every comment it would post (the one-pager staging comment included), every
+tag it would propose.
+
+It does record the run log, the findings and any hire scan in the operator's private
+store, each marked `mode: dry-run`. Those are how the board's Findings, Log and hire
+tabs show what the checks found while the operator is deciding whether to trust the
+proposals; a dry-run that left the board empty would be judged on chat scrollback.
+It does not advance the watermark or the ingested map, because nothing was created.
+See `reference/run-recovery.md`.
 
 This is the honest end-to-end test. It exercises mining, reconciliation, every
 enabled check and the routing decisions against your actual boards, and the only thing
@@ -22,9 +32,17 @@ routing decision *is* which real project a thing belongs in.
 
 Leave a new operator here for two full cadences.
 
+Outbox items proposed in dry-run are shown on the board and cannot be sent. The
+operator marks each one right or wrong, which is how dry-run tests what Ursula would
+say on their behalf without saying it.
+
 ### `sandbox` — for testing the write path
 
-Reads real boards. Redirects every write to one sandbox project. Use this to
+Reads real boards. Redirects every Jira write to one sandbox project. Calendar
+changes remain proposals in sandbox: a Jira sandbox does not isolate calendars.
+Operational records retain `mode: sandbox` and never advance the live mining
+watermark or live ingested mappings; save sandbox progress in its changeset instead.
+Use this to
 exercise the mechanics that dry-run cannot prove: label replacement actually
 preserving existing labels, transitions landing on the right status, comment
 formatting rendering correctly, the duplicate-key check firing.
@@ -41,8 +59,10 @@ Normal operation. Go here when a dry-run changeset has looked right twice runnin
 The gateway makes write tools available well beyond Jira. The skill must never
 touch them:
 
-- **Never send email.** Gmail send, reply and forward are loadable. Read-only.
-- **Never post to Slack.** Read-only.
+- **Never send email or post to Slack yourself.** Gmail send and Slack post are
+  loadable. A message another person will read is an outbox item the operator approves
+  on the board, which sends it (`reference/outbox.md`); in `dry-run` the board sends
+  nothing. The one exception is the operator alone: their own DM and their own address.
 - **Never edit, move, archive, delete or comment on a Confluence page.** Read-only.
   Changes to pages become tickets in the cleanup backlog (`reference/packs/content-cleanup.md`).
 - **Calendar writes only under the tiered approval in `SKILL.md`**, and never in

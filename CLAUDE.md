@@ -2,6 +2,12 @@
 
 Context for Claude Code working in this repo.
 
+Shared maintenance guidance now lives in `AGENTS.md`. Ursula also supports
+ChatGPT/Codex via `reference/runtime.md` and `docs/chatgpt.md`; the live artifact
+board remains Claude-specific. `scripts/render_snapshot.py` is executable code
+that can be checked locally without simulating connectors. Build both bundles
+with `bin/install.sh --target all`; validate with `--check`.
+
 ## What this is
 
 Ursula is a **skill**, not an application. There is nothing to compile, serve or run
@@ -44,6 +50,7 @@ reference/
   mining.md                 where commitments are found and how
   jira-conventions.md       API traps, all learned by getting them wrong
   artifact-board.md         the board's structure and capabilities
+  hire-scan.md              one person's board, written to its own tab
 docs/
   setup.md                  the interview + completion contract
   cadence.md                the weekly rhythm
@@ -100,12 +107,29 @@ five `content-cleanup` checks are unproven.
 
 Queued work, in rough priority order:
 
-1. **First real run of `content-cleanup`** — written, not yet run. Setup checks C1–C5
-   in `docs/setup.md` must record the observed Confluence fields back into the pack.
-2. **First real open of the board's Findings and Log tabs** — written and checked
-   against stub data only. Needs a run that writes `findings/` and `runs/`.
-3. **Confirm the upload format** assumed by `bin/install.sh` (`docs/release.md`).
-4. **Watched boards tab** on the board — described, not built.
+1. **Test the 2026-09-29 batch in claude.ai.** Written and checked locally against stub
+   data only; nothing below has touched real data. One upload covers all of it:
+   1. `bin/install.sh`, upload the zip replacing the old Ursula, and in a fresh chat ask
+      which version is running. It should name the version the script printed. If the
+      upload is rejected, `docs/release.md` → "Assumptions to confirm".
+   2. Republish the board from `artifact/index.html` to the existing URL with
+      `capabilities` omitted. Confirm This week still reads Jira and the calendar, and
+      that a note draft survives a reload (defect 13).
+   3. Dry-run a planning session. Confirm it writes `runs/` and `findings/` in the
+      `config/schema.md` shapes and that the Findings and Log tabs fill. Dismiss one
+      finding from the board and check the next session honours it.
+   4. "Scan Vandit's board." Confirm a Vandit tab appears, the live list reads RPTB-style
+      keys, and the *moved* query works on a watched project.
+   5. Daniel's setup with `content-cleanup`: setup checks C1–C5 in `docs/setup.md`, and
+      write the observed Confluence fields back into `reference/packs/content-cleanup.md`.
+   Log each result in `test/golden-week.md`, defects numbered from 14.
+2. **Loader skill that reads the repo live** — blocked on the Mirantis gateway: its
+   `github_oauth_start` sends the Google client id to GitHub, so GitHub sign-in 404s
+   (reported from claude.ai, reproducible since 22 Sep). Once fixed, a stub skill can
+   read `SKILL.md` and `reference/` from `jkomg/ursula` at a branch or tag, removing the
+   re-upload from the edit loop. Until then the zip is the only install path.
+3. **Watched boards tab** across every report at once — described in
+   `reference/artifact-board.md`, not built. Hire tabs cover one person at a time.
 
 ## Conventions
 

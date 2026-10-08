@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""Ursula's only door to the operator's LiteLLM key.
+
+The key never passes through the model. It is looked for in this order:
+
+  env    LITELLM_API_KEY, only if set (readable by anything in the session: avoid)
+  mac    the macOS Keychain, service "ursula-litellm"
+  cloud  nothing local: an API credential on the cloud environment (claude.ai/code, environment
+         settings, API credentials). Anthropic's proxy adds the Authorization
+         header after the request leaves the sandbox; nothing here ever holds it.
+         This is the one to use.
+
+Ursula calls this script; it never reads, echoes or writes the key itself.
+
+  bin/litellm check                   key present? endpoint reachable? budget left?
+  bin/litellm chat MODEL < prompt     one completion; prompt on stdin, answer on stdout
+  bin/litellm models                  model ids the key can use
+
+Exit codes: 0 ok, 2 no key configured, 3 endpoint refused or unreachable.
+"""
+import json
+import os
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+
+BASE = os.environ.get("LITELLM_BASE_URL", "https://api-gateway-litellm.mirantis.com").rstrip("/")
+KEYCHAIN_SERVICE = "ursula-litellm"
+
+
+def load_key():
+    key = os.environ.get("LITELLM_API_KEY", "").strip()
+    if key:
+        return key, "environment"
+    if sys.platform == "darwin":
+        try:
+            out = subprocess.run(
+                ["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-w"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if out.returncode == 0 and out.stdout.strip():
+                return out.stdout.strip(), "keychain"
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    return None, "proxy"
+
+
+KEY, KEY_SOURCE = load_key()   # KEY None: rely on the environment's API credential
+
+
+def scrub(text):
+    return text.replace(KEY, "[redacted]") if KEY else text
+
+
+def fail(code, message):
+    print(scrub(message), file=sys.stderr)
+    sys.exit(code)
+
+
+def request(path, payload=None, timeout=120):
+    data = json.dumps(payload).encode() if payload is not None else None
+    headers = {"Content-Type": "application/json"}
+    if KEY:
+        headers["Authorization"] = "Bearer " + KEY
+    req = urllib.request.Request(BASE + path, data=data, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403) and not KEY:
+            fail(2, NO_KEY)
+        fail(3, f"LiteLLM refused {path}: HTTP {e.code} {scrub(e.read().decode(errors='replace'))[:300]}")
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        fail(3, f"LiteLLM unreachable at {BASE}: {e}. In a cloud routine, the environment's "
+                f"network allowlist must include {BASE.split('//', 1)[-1]}.")
+
+
+NO_KEY = ("No LiteLLM key reached the gateway. Cloud: add an API credential on this routine's environment "
+          "(allowed website api-gateway-litellm.mirantis.com, header Authorization, prefix Bearer). "
+          "Mac: security add-generic-password -s ursula-litellm -a \"$USER\" -w (it prompts for the key). "
+          "Never paste the key into chat.")
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "check"
+    if cmd == "check":
+        models = request("/v1/models", timeout=30)
+        info = request("/key/info", timeout=30).get("info", {})
+        print(json.dumps({
+            "key": "accepted", "source": KEY_SOURCE, "endpoint": BASE,
+            "models": len(models.get("data", [])),
+            "spend_usd": info.get("spend"), "budget_usd": info.get("max_budget"),
+            "budget_resets": info.get("budget_reset_at"), "key_expires": info.get("expires"),
+        }, indent=2))
+    elif cmd == "models":
+        for m in sorted(x["id"] for x in request("/v1/models", timeout=30).get("data", [])):
+            print(m)
+    elif cmd == "chat":
+        if len(sys.argv) < 3:
+            fail(1, "usage: bin/litellm chat MODEL < prompt")
+        prompt = sys.stdin.read()
+        out = request("/v1/chat/completions", {
+            "model": sys.argv[2], "messages": [{"role": "user", "content": prompt}],
+        })
+        print(scrub(out["choices"][0]["message"]["content"] or ""))
+        usage = out.get("usage") or {}
+        print(f"[litellm] model={out.get('model')} in={usage.get('prompt_tokens')} "
+              f"out={usage.get('completion_tokens')}", file=sys.stderr)
+    else:
+        fail(1, __doc__)
+
+
+if __name__ == "__main__":
+    main()

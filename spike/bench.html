@@ -1,0 +1,202 @@
+<title>Ursula Spike Bench</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one narrow column — a lab bench sheet. Tests up top as a checklist, outbox below as a ledger. */
+:root {
+  --bg: #f5f6f3; --surface: #ffffff; --ink: #1d2320; --muted: #5d6862; --line: #d9ddd8;
+  --accent: #2f5d50; --accent-ink: #ffffff;
+  --pass: #2e7d4f; --fail: #b3412f; --wait: #8a6d1d;
+  --f-display: "Fraunces", Georgia, serif;
+  --f-body: "IBM Plex Sans", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #151a18; --surface: #1d2421; --ink: #e6ebe7; --muted: #9aa6a0; --line: #2f3834;
+  --accent: #7fb8a5; --accent-ink: #10201b; --pass: #6cc58f; --fail: #ec8a78; --wait: #d9b85c; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #151a18; --surface: #1d2421; --ink: #e6ebe7; --muted: #9aa6a0; --line: #2f3834;
+  --accent: #7fb8a5; --accent-ink: #10201b; --pass: #6cc58f; --fail: #ec8a78; --wait: #d9b85c; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--f-body); }
+.wrap { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; display: grid; gap: 32px; }
+header h1 { font: 650 30px/1.15 var(--f-display); margin: 0 0 6px; text-wrap: balance; }
+header p { margin: 0; color: var(--muted); max-width: 62ch; }
+h2 { font: 500 13px/1 var(--f-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.tests { list-style: none; margin: 0; padding: 0; }
+.tests li { display: grid; grid-template-columns: 76px 1fr; gap: 4px 14px; padding: 14px 16px; border-top: 1px solid var(--line); }
+.tests li:first-child { border-top: 0; }
+.tests .name { font-weight: 600; }
+.tests .detail { grid-column: 2; color: var(--muted); font: 13px/1.5 var(--f-mono); overflow-wrap: anywhere; min-width: 0; }
+.pill { align-self: start; justify-self: start; font: 500 12px/1 var(--f-mono); padding: 5px 8px; border-radius: 99px; border: 1px solid currentColor; }
+.pill.pass { color: var(--pass); } .pill.fail { color: var(--fail); } .pill.pending, .pill.proposed { color: var(--wait); } .pill.deferred { color: var(--muted); }
+.pill.sent { color: var(--pass); } .pill.failed, .pill.rejected { color: var(--fail); } .pill.approved { color: var(--accent); }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.row h2 { margin: 0; }
+button { font: 500 14px/1 var(--f-body); padding: 9px 14px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mail { padding: 16px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+.mail:first-child { border-top: 0; }
+.mail .top { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.mail .subj { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.mail .meta, .mail .receipt { font: 12.5px/1.5 var(--f-mono); color: var(--muted); overflow-wrap: anywhere; }
+.mail pre { margin: 0; white-space: pre-wrap; font: 13.5px/1.5 var(--f-body); background: var(--bg); border-radius: 6px; padding: 10px 12px; }
+.mail .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.empty { padding: 20px 16px; color: var(--muted); }
+.note { font-size: 13px; color: var(--muted); }
+#status { font: 13px/1.4 var(--f-mono); color: var(--muted); min-height: 1.4em; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Ursula Spike Bench</h1>
+    <p>Four checks for an always-on Ursula: can a cloud routine write here, reach you in Slack, and use LiteLLM, and can an approval on this page send mail and keep a receipt?</p>
+  </header>
+
+  <section>
+    <h2>Capability checks</h2>
+    <ul class="tests panel" id="tests">
+      <li><span class="pill pending">waiting</span><span class="name">Loading results…</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="row">
+      <h2>Outbox</h2>
+      <button id="propose">Propose a test email to me</button>
+    </div>
+    <div class="panel" id="outbox"><div class="empty">Nothing proposed yet. A routine run adds one here, or use the button above.</div></div>
+    <p class="note">In this spike, email can only go to your own address. Every item keeps what was proposed, who approved it, and Gmail's reply.</p>
+    <div id="status" role="status"></div>
+  </section>
+</div>
+
+<script>
+const TESTS = [
+  ["db-write", "Routine writes to this page's database"],
+  ["slack-dm", "Routine sends you a Slack DM"],
+  ["slack-read", "Routine reads your reply in that DM"],
+  ["litellm", "Routine calls LiteLLM without seeing the key"],
+  ["gmail-button", "Approval on this page sends an email"],
+];
+const GMAIL_SERVER = "Custom Google Drive";
+const GMAIL_TOOL = "gws_gmail_send";
+
+const $ = (id) => document.getElementById(id);
+const say = (t) => { $("status").textContent = t; };
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const when = (iso) => { try { return iso ? new Date(iso).toLocaleString() : ""; } catch { return iso || ""; } };
+
+let db = null, mcp = null, user = null, myEmail = null, myId = null;
+let spikeDocs = new Map(), outboxDocs = [];
+
+function renderTests() {
+  const ul = $("tests"); ul.replaceChildren();
+  for (const [id, label] of TESTS) {
+    const d = spikeDocs.get(id);
+    const status = d?.status || "pending";
+    const li = el("li");
+    li.append(el("span", "pill " + status, status === "pending" ? "not run" : status));
+    li.append(el("span", "name", label));
+    li.append(el("span", "detail", d ? `${d.detail || ""}${d.at ? "  ·  " + when(d.at) : ""}${d.by ? "  ·  by " + d.by : ""}` : "No result yet."));
+    ul.append(li);
+  }
+}
+
+function renderOutbox() {
+  const box = $("outbox"); box.replaceChildren();
+  if (!outboxDocs.length) { box.append(el("div", "empty", "Nothing proposed yet. A routine run adds one here, or use the button above.")); return; }
+  for (const snap of outboxDocs) {
+    const m = snap.data(); const card = el("div", "mail");
+    const top = el("div", "top");
+    top.append(el("span", "pill " + m.status, m.status));
+    top.append(el("span", "subj", m.subject || "(no subject)"));
+    card.append(top);
+    card.append(el("div", "meta", `to ${m.to}  ·  proposed by ${m.proposed_by || "?"} ${when(m.proposed_at)}${m.why ? "  ·  why: " + m.why : ""}`));
+    card.append(el("pre", null, m.body || ""));
+    if (m.status === "proposed") {
+      const a = el("div", "actions");
+      const ok = el("button", "primary", "Approve and send"); ok.onclick = () => approve(snap, ok);
+      const no = el("button", null, "Reject"); no.onclick = () => reject(snap, no);
+      a.append(ok, no); card.append(a);
+    }
+    if (m.approved_at) card.append(el("div", "receipt", `approved ${when(m.approved_at)}`));
+    if (m.sent_at) card.append(el("div", "receipt", `sent ${when(m.sent_at)}  ·  gmail id ${m.receipt?.id || "?"}  ·  thread ${m.receipt?.threadId || "?"}`));
+    if (m.error) card.append(el("div", "receipt", `error: ${m.error}`));
+    box.append(card);
+  }
+}
+
+async function setTest(id, status, detail) {
+  if (!db) return;
+  try { await db.doc("spike/" + id).set({ test: id, status, detail, at: new Date().toISOString(), by: "board" }); }
+  catch (e) { say("Could not record the result: " + (e.code || e.message)); }
+}
+
+async function propose() {
+  if (!db) return say("This view has no database access.");
+  if (!myEmail) return say("Your address is not set up for this page yet (config/self), so it cannot propose mail to you.");
+  $("propose").disabled = true;
+  try {
+    await db.collection("outbox").doc("board-" + Date.now()).set({
+      kind: "email", to: myEmail, subject: "Ursula spike: test from the board",
+      body: "Proposed from the Ursula Spike Bench. If this arrived, approving on the board sends mail and the receipt is kept.",
+      why: "manual spike test", status: "proposed", proposed_by: "board", proposed_at: new Date().toISOString(),
+    });
+    say("Proposed. Approve it below.");
+  } catch (e) { say("Could not propose: " + (e.code || e.message)); }
+  $("propose").disabled = false;
+}
+
+async function reject(snap, btn) {
+  btn.disabled = true;
+  try { await db.doc("outbox/" + snap.id).update({ status: "rejected", rejected_at: new Date().toISOString(), rejected_by: myId }); say("Rejected. Nothing was sent."); }
+  catch (e) { say("Could not reject: " + (e.code || e.message)); btn.disabled = false; }
+}
+
+async function approve(snap, btn) {
+  const m = snap.data();
+  if (!mcp) return say("Gmail is not available in this view, so nothing was sent.");
+  if (!myEmail || String(m.to).trim().toLowerCase() !== myEmail.toLowerCase()) {
+    return say("Refused: in this spike, mail may only go to your own address.");
+  }
+  btn.disabled = true;
+  const ref = db.doc("outbox/" + snap.id);
+  try { await ref.update({ status: "approved", approved_at: new Date().toISOString(), approved_by: myId }); }
+  catch (e) { btn.disabled = false; return say("Could not record the approval, so nothing was sent: " + (e.code || e.message)); }
+  say("Sending…");
+  try {
+    const r = await mcp.callTool(GMAIL_SERVER, GMAIL_TOOL, { args: ["--to", m.to, "--subject", m.subject, "--body", m.body] });
+    let payload = r.payload ?? r.structuredContent;
+    if (payload == null) { const t = (r.content || []).find((c) => c.type === "text")?.text; try { payload = JSON.parse(t); } catch { payload = { text: t }; } }
+    const receipt = { id: payload?.id ?? null, threadId: payload?.threadId ?? null, labelIds: payload?.labelIds ?? null };
+    await ref.update({ status: "sent", sent_at: new Date().toISOString(), receipt });
+    await setTest("gmail-button", receipt.id ? "pass" : "fail", receipt.id ? `sent, gmail id ${receipt.id}` : "tool answered without a message id: " + JSON.stringify(payload).slice(0, 200));
+    say("Sent. Receipt saved.");
+  } catch (e) {
+    const code = e?.code || "error";
+    const hint = { server_not_connected: `Add the ${GMAIL_SERVER} connector in claude.ai settings.`,
+      needs_reauth: `Reconnect ${GMAIL_SERVER} in claude.ai settings.`,
+      not_granted: "You declined Gmail access for this page.",
+      server_unavailable: "No reply in time. It may still have sent: check Gmail Sent before trying again." }[code] || e?.message || "";
+    await ref.update({ status: "failed", error: `${code}: ${hint}`.slice(0, 500) }).catch(() => {});
+    await setTest("gmail-button", "fail", `${code}: ${hint}`.slice(0, 300));
+    say(`Not sent (${code}). ${hint}`);
+  }
+}
+
+(async function start() {
+  renderTests();
+  $("propose").onclick = propose;
+  [db, mcp, user] = await Promise.all(["db", "mcp", "user"].map((n) => window.claude?.use?.(n) ?? Promise.resolve(null)));
+  if (!db) { say("This view has no database access. Sign in to claude.ai to see results."); $("propose").disabled = true; return; }
+  if (user) myId = await user.id();
+  try { const c = await db.doc("config/self").get(); myEmail = c.exists ? String(c.data().email || "") || null : null; } catch { myEmail = null; }
+  db.collection("spike").onSnapshot((s) => { spikeDocs = new Map(s.docs.map((d) => [d.id, d.data()])); renderTests(); },
+    (e) => say("Results unavailable: " + e.code));
+  db.collection("outbox").orderBy("proposed_at", "desc").limit(50).onSnapshot((s) => { outboxDocs = s.docs; renderOutbox(); },
+    (e) => say("Outbox unavailable: " + e.code));
+})();
+</script>
