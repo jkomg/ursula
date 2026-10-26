@@ -56,6 +56,23 @@ needs: new meeting-notes documents, direct commitments by email, calendar change
 today and the next working day. Reconcile against Jira before proposing anything; a
 check-in that proposes a ticket that already exists is noise.
 
+**Coverage is part of success.** Two sources are required every check-in, and a
+check-in that did not read both is `partial`, however clean the rest looks:
+
+1. **Drive notes.** List every notes document modified in the window (Gemini notes,
+   `Notes - <meeting>` documents), open each one, take its action items and reconcile
+   them against Jira. A title seen in a listing is not a read. An empty template is read
+   and reported as empty.
+2. **Gmail.** Read the window's mail, not just the newest page: page through
+   `messages_list` until the window is covered, read the headers of everything that is
+   not an automated notification, and open anything from a person. If one Gmail tool
+   fails (a 502 from `google_gmail_messages_list`, say), try the other
+   (`gws_gmail_users_messages_list`) before giving up.
+
+The first defect: a check-in listed two new notes by title, skipped Gmail, recorded
+`complete` and advanced the watermark, so the next window would never have contained
+them. The one-line summary said "nothing needs you".
+
 ### 3. The quick checks
 
 Run only the checks that cannot wait for the next cadence:
@@ -106,6 +123,12 @@ the operator, by level:
 A connector that failed for a reason only the operator can fix goes in the final line
 at every level ("Reconnect Atlassian in claude.ai settings: Jira refused every call").
 
+**A `partial` run says so in the final line at every level, including `quiet`**, naming
+what was not read: "Ursula: partial, Gmail and 2 Drive notes not read, will retry".
+`Nothing needs you.` is only for a `complete` run. Silence that hides a gap is the
+failure this skill exists to prevent. "Read 0 notes" is ambiguous; say "0 new board
+notes" and name what else was read.
+
 The board is the record at every level: the Outbox tab and Findings hold the detail
 the line points to.
 
@@ -119,8 +142,14 @@ connector write, which is the right default.
 
 - `runs/<date>-checkin-<HHMM>` with `session: checkin` and the usual fields; `created`
   and `edited` are 0 because a check-in writes to Jira only through the outbox
+- `status`: `complete` only if the coverage rule above was met (Drive notes opened,
+  Gmail windowed and read) and no required connector failed. Otherwise `partial`, with
+  each unread source named in `could_not`. Never write `complete` on a run whose
+  `could_not` lists a skipped required source
 - `state/checkin`: `watermark` to the frozen window end and `slack_last_ts` to the
-  newest operator message read, **only if the check-in completed**
+  newest operator message read, **only if `status` is `complete`**. A `partial` run
+  leaves both where they were, so the next check-in re-reads the same window;
+  reconciliation skips what already exists
 - `could_not`: every connector that failed, every source it could not open. A check-in
   that quietly skipped Jira looks exactly like one that found nothing
 - A connector that failed for a reason only the operator can fix belongs in the final
