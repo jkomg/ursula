@@ -167,6 +167,8 @@ check-in. The board shows the latest 52 sessions and folds check-ins under the d
 | `watermark_before`, `watermark_after` | Timestamps; after remains before on a partial/failed run |
 | `window_start`, `window_end` | Frozen UTC mining bounds; only a successful run advances to window_end |
 | `sources` | `{found, expected, unmatched_meetings: [names]}` — `expected` is the prediction stated before mining |
+| `coverage` | Check-ins only: `{notes_read, slack_dm_read (null if no DM configured), drive_docs_opened, drive_docs_in_window, gmail_listed, gmail_read, open_set, open_set_evaluated, outbox_stale}`. `scripts/checkin_verify.py` refuses `complete` without them |
+| `findings_resolved` | Check-ins: open findings closed this run by `session` |
 | `created`, `skipped`, `edited` | Counts from reconcile and write-back |
 | `tags_proposed`, `tags_accepted` | Counts from the tagging sweep |
 | `findings_new`, `findings_carried` | Counts |

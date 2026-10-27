@@ -23,6 +23,11 @@ Monday and Thursday, where the operator is present to decide.
    message it read. It is separate from `state/watermark`, which only the Monday and
    Thursday sessions advance.
 4. **Freeze the window**: from `state/checkin.watermark` to now.
+5. **Check the routine itself ran.** The check-ins are scheduled
+   (`config/checkins.schedule`). List the last day's `runs` with `session: checkin`; if a
+   scheduled slot has no record (the routine did not fire, or died before writing), say
+   so in `could_not` and the final line. Nothing else notices a check-in that never
+   happened.
 
 ## The passes
 
@@ -56,8 +61,11 @@ needs: new meeting-notes documents, direct commitments by email, calendar change
 today and the next working day. Reconcile against Jira before proposing anything; a
 check-in that proposes a ticket that already exists is noise.
 
-**Coverage is part of success.** Two sources are required every check-in, and a
-check-in that did not read both is `partial`, however clean the rest looks:
+**Coverage is part of success.** Three sources are required every check-in, and a
+check-in that did not read all of them is `partial`, however clean the rest looks. The
+operator's Slack DM (pass 1) is the third: it is read every run when
+`config/checkins.slack_dm` is set, and a run that did not use the Slack connector says
+so as a skipped source. The other two:
 
 1. **Drive notes.** List every notes document modified in the window (Gemini notes,
    `Notes - <meeting>` documents), open each one, take its action items and reconcile
@@ -65,7 +73,10 @@ check-in that did not read both is `partial`, however clean the rest looks:
    and reported as empty.
 2. **Gmail.** Read the window's mail, not just the newest page: page through
    `messages_list` until the window is covered, read the headers of everything that is
-   not an automated notification, and open anything from a person. If one Gmail tool
+   not an automated notification, and open anything from a person. A list of message
+   ids is not a read (a run that listed 25 of about 200 ids and triaged none recorded
+   itself as having checked mail). If a helper caps the count, page again for the
+   rest. If one Gmail tool
    fails (a 502 from `google_gmail_messages_list`, say), try the other
    (`gws_gmail_users_messages_list`) before giving up.
 
@@ -84,6 +95,39 @@ Run only the checks that cannot wait for the next cadence:
 
 Each one that fires becomes a finding (`findings/<key>`) with a recommendation, exactly
 as in `reference/analysis-checks.md`. The full set runs on Monday and Thursday.
+
+**Re-evaluate every open finding first, before looking for new ones.** A new day's
+check-in starts from the board, not from an empty page. A morning run read the calendar,
+wrote "no collisions today" and "nothing due today" and carried none of four open
+findings, one of which was a collision at 11:30 that same morning and another a review
+due close of business. So, on every check-in:
+
+1. List `findings` whose `status` is `open` or `carried`. This is the **open set**; its
+   size goes in the run record.
+2. For each one, re-test its evidence against the clock and a fresh read: is the
+   calendar overlap still there, is the item still unmoved, has the thread been
+   answered, has the ticket changed? Then set `status` (`carried`, or `resolved` with
+   `closed_by: "session"` and a `close_note` saying what you observed), update
+   `last_seen`, and add a line to `evidence_note` with the time you re-read it.
+3. A finding whose time is **today or the next working day** (a collision, a due date,
+   a "by close of business") is **imminent**. Imminent findings cannot be dropped from
+   the final line at any voice level, and a check that reports `calendar-collision-today`
+   or `due-today-or-tomorrow` as clean while an imminent finding of that check is open
+   is wrong by construction.
+4. Never close a finding because it fell out of the window. A finding closes when its
+   cause is gone, or the operator closes it. A cause that is plainly gone is closed by
+   the check-in, not left open: a collision whose event has passed is `resolved` with
+   `close_note: "event passed <date>"`; a due-date finding whose ticket is now Done, or
+   whose due date moved, is `resolved` with what you saw. Fifteen collision and
+   due-date findings from weeks 40 to 43 were still `open` on 27 Oct, which made the
+   open set noise and hid the two that mattered.
+
+**Time zones.** Calendar events carry an offset and sometimes a separate `timeZone`
+that disagrees with it (an organiser in Central time, an offset in Eastern). Convert
+every start and end to the operator's zone (`config/cadence` `tz`) from the offset, and
+compare instants, not clock faces. When the two disagree and the overlap depends on
+which is right, raise it as a rank-3 finding that says so; do not leave it as a note
+in `could_not`.
 
 ### 4. Stage and propose
 
@@ -125,7 +169,9 @@ at every level ("Reconnect Atlassian in claude.ai settings: Jira refused every c
 
 **A `partial` run says so in the final line at every level, including `quiet`**, naming
 what was not read: "Ursula: partial, Gmail and 2 Drive notes not read, will retry".
-`Nothing needs you.` is only for a `complete` run. Silence that hides a gap is the
+`Nothing needs you.` is only for a `complete` run with **no imminent finding and no stale
+outbox item**. An imminent finding is always named, at every level: "Ursula: 11:30
+collision today, VA MOSAIC review due COB". Silence that hides a gap is the
 failure this skill exists to prevent. "Read 0 notes" is ambiguous; say "0 new board
 notes" and name what else was read.
 
@@ -142,6 +188,16 @@ connector write, which is the right default.
 
 - `runs/<date>-checkin-<HHMM>` with `session: checkin` and the usual fields; `created`
   and `edited` are 0 because a check-in writes to Jira only through the outbox
+- `coverage`: `{notes_read, slack_dm_read, drive_docs_opened, drive_docs_in_window,
+  gmail_listed, gmail_read, open_set, open_set_evaluated, outbox_stale}`, the counts
+  and booleans behind the rules above, so that completeness can be checked rather than
+  claimed. `scripts/checkin_verify.py` reads this and the findings and refuses a record
+  that says `complete` without them; run it on the record before writing it (see
+  "Close-out" below)
+- Outbox: list items with status `proposed` whose `expires_at` has passed, count them in
+  `coverage.outbox_stale` and name them in the summary. The board will not send them;
+  only the operator can re-approve or reject, so a stale item is a thing the operator
+  needs to hear about once, not an item to leave untouched and unmentioned
 - `status`: `complete` only if the coverage rule above was met (Drive notes opened,
   Gmail windowed and read) and no required connector failed. Otherwise `partial`, with
   each unread source named in `could_not`. Never write `complete` on a run whose
@@ -156,6 +212,22 @@ connector write, which is the right default.
   line: Jira answering 403 "The app is not installed on this instance" means the
   claude.ai Atlassian connection has lapsed, and the fix is to reconnect it in
   claude.ai Settings → Connectors
+
+### Close-out
+
+Before the final message:
+
+1. Write the run record as `status: "complete"` or `"partial"` honestly, with `coverage`.
+2. Run `python3 scripts/checkin_verify.py <record.json> <findings-dir>` against that
+   record (write it to a scratch file; `findings-dir` holds the open findings as JSON,
+   fetched with ArtifactData `out_dir`). It exits non-zero and prints each broken rule.
+   Fix the record, or downgrade `status` to `partial`, until it passes. Only then move
+   the watermark.
+3. Build the final line from the verified record, not from memory: `partial` first,
+   then imminent findings, then needs-OK items, then the level's own content.
+
+A check-in that cannot run the script (no Python) says so in `could_not` and is
+`partial`.
 
 ## Untrusted input
 
