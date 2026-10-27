@@ -307,3 +307,19 @@ against the two live records above it fails both, for the reasons listed. Run ag
 constructed good record it passes, and fails the same record when `could_not` admits an
 unread source. It checks that a record is consistent, not that the sources were read.
 No claude.ai run of the new rules yet.
+
+### Same day: harness-written evidence (hooks and scripts, no claude.ai run)
+
+Added `bin/ledger-log` (PostToolUse), `bin/guard-ledger`, `scripts/checkin_close.py`,
+`scripts/audit_trend.py` and `docs/governance.md`. Exercised here against synthetic hook
+events (our own code, not a connector): the ledger chains and records errors; a run that
+claims 5 documents and 9 mails when the ledger shows 2 and 1 is refused, is `partial`, gets
+no watermark and a final line that leads with the gap; deleting a ledger line is reported as
+a broken chain; the guard denies a command naming the ledger and allows the close script;
+with two findings given `due_at` the final line names both. The audit, run over the 57
+real check-in records, shows 0 verified runs, 25 to 53 per cent partial weeks and 18
+silent-green runs. Not yet proven: that the PostToolUse hook receives `tool_response` and
+`session_id` as assumed on the claude.ai cloud environment, that the ledger path is
+writable there, and that a real check-in follows the close-out. First thing to read after
+the next check-in: its `ledger` block and `verified.ok`; if `calls` is 0 the hook is not
+running on that environment and every run will report `partial` (correctly).

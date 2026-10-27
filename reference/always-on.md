@@ -116,8 +116,9 @@ due close of business. So, on every check-in:
    is wrong by construction.
 4. Never close a finding because it fell out of the window. A finding closes when its
    cause is gone, or the operator closes it. A cause that is plainly gone is closed by
-   the check-in, not left open: a collision whose event has passed is `resolved` with
-   `close_note: "event passed <date>"`; a due-date finding whose ticket is now Done, or
+   the check-in, not left open: a collision whose event has passed is `lapsed` (not `resolved`: nobody fixed it, and
+   the audit counts these) with `close_note: "event passed <date>"`; set `due_at` when
+   you raise a finding so imminence can be computed rather than judged; a due-date finding whose ticket is now Done, or
    whose due date moved, is `resolved` with what you saw. Fifteen collision and
    due-date findings from weeks 40 to 43 were still `open` on 27 Oct, which made the
    open set noise and hid the two that mattered.
@@ -215,19 +216,29 @@ connector write, which is the right default.
 
 ### Close-out
 
-Before the final message:
+The run record is the model's own account. Close-out checks it against evidence the model
+did not write: `bin/ledger-log`, a hook on the routine, appends every connector and board
+call to a hash-chained ledger with the harness's clock (`docs/governance.md`).
 
-1. Write the run record as `status: "complete"` or `"partial"` honestly, with `coverage`.
-2. Run `python3 scripts/checkin_verify.py <record.json> <findings-dir>` against that
-   record (write it to a scratch file; `findings-dir` holds the open findings as JSON,
-   fetched with ArtifactData `out_dir`). It exits non-zero and prints each broken rule.
-   Fix the record, or downgrade `status` to `partial`, until it passes. Only then move
-   the watermark.
-3. Build the final line from the verified record, not from memory: `partial` first,
-   then imminent findings, then needs-OK items, then the level's own content.
+1. Write the run record as `status: "complete"` or `"partial"` honestly, with `coverage`
+   (now including `gmail_opened`), to a scratch file. Export the open findings with
+   ArtifactData `out_dir`, and the outbox if `outbox_stale` or needs-OK counts matter.
+2. Run `python3 scripts/checkin_close.py RUN.json FINDINGS_DIR --level <config/voice.level> --slack-dm <config/checkins.slack_dm>`. (The ledger is
+   found from `URSULA_LEDGER`, default `/var/tmp/ursula-ledger/ledger.jsonl`; do not read
+   or write that file directly, the guard denies it.) It verifies the record against the open findings and
+   the ledger, and prints `status_allowed`, `final_line`, `state_checkin` and a `ledger`
+   summary.
+3. Write `status` as `status_allowed`, store `verified: {ok, errors}` and the `ledger`
+   summary (including `head`) on the run record, and move `state/checkin` **only to the
+   `state_checkin` it printed**, which exists only when verification passed.
+4. The final message is `final_line`, verbatim. Do not rewrite it, shorten it or
+   substitute "Nothing needs you." The script has already put `partial` first, then
+   imminent findings, then outbox items.
 
-A check-in that cannot run the script (no Python) says so in `could_not` and is
-`partial`.
+If the script cannot run (no Python, no ledger because the hooks are not on this
+environment), the run is `partial`, says so in `could_not` and the final line, and moves
+nothing. A check-in that finds the ledger empty has not been observed; it must not
+present itself as verified.
 
 ## Untrusted input
 

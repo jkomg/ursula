@@ -135,7 +135,8 @@ hyphens, no accents.
 | `check` | Check slug, e.g. `deadline-inversion` |
 | `pack` | `core`, or the pack name |
 | `title` | One line, readable cold |
-| `status` | `open` · `carried` (open and seen again this run) · `resolved` · `dismissed` |
+| `status` | `open` · `carried` (open and seen again this run) · `resolved` (the cause was dealt with or is gone) · `lapsed` (its time passed and nobody acted; stays visible and is counted by the audit) · `dismissed` |
+| `due_at` | Optional ISO datetime with offset: when the finding bites (a meeting start, a due date, a close of business). `scripts/checkin_close.py` treats an open finding as imminent when this is past or within 36 hours; without it a finding is never named in the final line |
 | `rank` | Order by consequence this run; 1 is the most serious. The board sorts on it |
 | `first_seen`, `last_seen` | ISO dates |
 | `evidence`, `consequence`, `recommendation` | Plain text. A finding without a recommendation is unfinished |
@@ -167,7 +168,8 @@ check-in. The board shows the latest 52 sessions and folds check-ins under the d
 | `watermark_before`, `watermark_after` | Timestamps; after remains before on a partial/failed run |
 | `window_start`, `window_end` | Frozen UTC mining bounds; only a successful run advances to window_end |
 | `sources` | `{found, expected, unmatched_meetings: [names]}` — `expected` is the prediction stated before mining |
-| `coverage` | Check-ins only: `{notes_read, slack_dm_read (null if no DM configured), drive_docs_opened, drive_docs_in_window, gmail_listed, gmail_read, open_set, open_set_evaluated, outbox_stale}`. `scripts/checkin_verify.py` refuses `complete` without them |
+| `coverage` | Check-ins only: `{notes_read, slack_dm_read (null if no DM configured), drive_docs_opened, drive_docs_in_window, gmail_listed, gmail_opened, gmail_read, open_set, open_set_evaluated, outbox_stale}`. `scripts/checkin_verify.py` refuses `complete` without them |
+| `verified`, `ledger` | `{ok, errors}` and `{calls, errors, head, first, last, by_tool}` from `scripts/checkin_close.py`. A check-in run without `verified.ok` is unverified, and `scripts/audit_trend.py` counts it |
 | `findings_resolved` | Check-ins: open findings closed this run by `session` |
 | `created`, `skipped`, `edited` | Counts from reconcile and write-back |
 | `tags_proposed`, `tags_accepted` | Counts from the tagging sweep |
