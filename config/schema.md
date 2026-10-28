@@ -16,7 +16,9 @@ Setup is a conversation.
 setup completion contract passes, then `complete`. Record missing setup checks
 alongside status. `sandbox_project` is required in sandbox. `prohibitions` records
 the hard limits in `SKILL.md`; `calendar` may restrict the allowed approval tiers.
-Missing mode is dry-run, never implicit permission to write.
+Missing mode is dry-run, never implicit permission to write. `home`, when set to a
+host other than the current one, marks this store retired after a move (`docs/setup.md`,
+"Moving hosts"); a session reading it stops.
 
 ### `config/jira`
 

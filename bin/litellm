@@ -6,8 +6,8 @@ The key never passes through the model. It is looked for in this order:
   env    LITELLM_API_KEY, only if set (readable by anything in the session: avoid)
   mac    the macOS Keychain, service "ursula-litellm"
   win    Windows Credential Manager, generic credential "ursula-litellm"; the operator
-         stores it once with: cmdkey /generic:ursula-litellm /user:litellm /pass
-         (cmdkey prompts for the key; it never appears on screen or in history)
+         stores it once, in their own terminal, with: python bin/litellm store
+         (hidden prompt; refuses control characters, which cmdkey silently stores)
   cloud  nothing local: an API credential on the cloud environment (claude.ai/code, environment
          settings, API credentials). Anthropic's proxy adds the Authorization
          header after the request leaves the sandbox; nothing here ever holds it.
@@ -15,6 +15,7 @@ The key never passes through the model. It is looked for in this order:
 
 Ursula calls this script; it never reads, echoes or writes the key itself.
 
+  bin/litellm store                   operator only, Windows: prompt for the key and save it
   bin/litellm check                   key present? endpoint reachable? budget left?
   bin/litellm chat MODEL < prompt     one completion; prompt on stdin, answer on stdout
   bin/litellm models                  model ids the key can use
@@ -83,7 +84,17 @@ def windows_credential(target):
         text = raw.decode("utf-16-le")
     except UnicodeDecodeError:
         text = raw.decode("utf-8", errors="ignore")
-    return text.strip() or None
+    # Some tools store a trailing NUL; a NUL in the Authorization header gets a bare 400.
+    return text.strip("\x00 \t\r\n") or None
+
+
+def key_shape(key):
+    """Describe the key without revealing it, for diagnosing a rejected header."""
+    if not key:
+        return "no key"
+    odd = sum(1 for c in key if not (33 <= ord(c) <= 126))
+    return (f"key from {KEY_SOURCE}: {len(key)} chars, starts 'sk-': {key.startswith('sk-')}, "
+            f"non-printable or non-ASCII chars: {odd}")
 
 
 KEY, KEY_SOURCE = load_key()   # KEY None: rely on the environment's API credential
@@ -110,7 +121,9 @@ def request(path, payload=None, timeout=120):
     except urllib.error.HTTPError as e:
         if e.code in (401, 403) and not KEY:
             fail(2, NO_KEY)
-        fail(3, f"LiteLLM refused {path}: HTTP {e.code} {scrub(e.read().decode(errors='replace'))[:300]}")
+        body = scrub(e.read().decode(errors='replace'))
+        hint = f" ({key_shape(KEY)})" if KEY and e.code in (400, 401, 403) else ""
+        fail(3, f"LiteLLM refused {path}: HTTP {e.code}{hint} {body[:300]}")
     except (urllib.error.URLError, TimeoutError, OSError) as e:
         fail(3, f"LiteLLM unreachable at {BASE}: {e}. In a cloud routine, the environment's "
                 f"network allowlist must include {BASE.split('//', 1)[-1]}.")
@@ -119,12 +132,59 @@ def request(path, payload=None, timeout=120):
 NO_KEY = ("No LiteLLM key reached the gateway. Cloud: add an API credential on this routine's environment "
           "(allowed website api-gateway-litellm.mirantis.com, header Authorization, prefix Bearer). "
           "Mac: security add-generic-password -s ursula-litellm -a \"$USER\" -w (it prompts for the key). "
-          "Windows: cmdkey /generic:ursula-litellm /user:litellm /pass (it prompts for the key). "
+          "Windows: run python bin/litellm store in your own terminal (it prompts for the key). "
           "Never paste the key into chat.")
+
+
+def store_windows(target):
+    """Operator-only: prompt for the key (hidden) and save it as a generic credential.
+
+    Replaces `cmdkey ... /pass`, whose hidden prompt in a classic console stores Ctrl+V as
+    a literal control character instead of pasting (observed 2026-10-28: a 1-char key).
+    """
+    import ctypes
+    import getpass
+    from ctypes import wintypes
+
+    # isatty() is True for NUL on Windows, so ask the console itself: GetConsoleMode fails
+    # unless stdin is a real interactive console (observed hanging an agent's shell).
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.GetStdHandle.restype = wintypes.HANDLE
+    mode = wintypes.DWORD()
+    if not (sys.stdin.isatty() and k32.GetConsoleMode(k32.GetStdHandle(-10), ctypes.byref(mode))):
+        fail(1, "store must be run by you in your own terminal, not by an agent.")
+    key = getpass.getpass("LiteLLM key (input hidden; paste with right-click or Ctrl+Shift+V): ")
+    key = key.strip("\x00 \t\r\n")
+    if not key or any(not (33 <= ord(c) <= 126) for c in key):
+        fail(1, f"That input has {len(key)} characters including control or non-ASCII ones, so it is "
+                "not a key. In a classic console Ctrl+V types a control character; paste with "
+                "right-click, or use Windows Terminal. Nothing was stored.")
+
+    class CREDENTIAL(ctypes.Structure):
+        _fields_ = [("Flags", wintypes.DWORD), ("Type", wintypes.DWORD),
+                    ("TargetName", wintypes.LPWSTR), ("Comment", wintypes.LPWSTR),
+                    ("LastWritten", wintypes.FILETIME), ("CredentialBlobSize", wintypes.DWORD),
+                    ("CredentialBlob", ctypes.POINTER(ctypes.c_ubyte)), ("Persist", wintypes.DWORD),
+                    ("AttributeCount", wintypes.DWORD), ("Attributes", ctypes.c_void_p),
+                    ("TargetAlias", wintypes.LPWSTR), ("UserName", wintypes.LPWSTR)]
+
+    blob = key.encode("utf-16-le")
+    buf = (ctypes.c_ubyte * len(blob)).from_buffer_copy(blob)
+    cred = CREDENTIAL(Type=1, TargetName=target, CredentialBlobSize=len(blob),
+                      CredentialBlob=ctypes.cast(buf, ctypes.POINTER(ctypes.c_ubyte)),
+                      Persist=2, UserName="litellm")   # 1 = GENERIC, 2 = LOCAL_MACHINE persistence
+    if not ctypes.WinDLL("advapi32", use_last_error=True).CredWriteW(ctypes.byref(cred), 0):
+        fail(1, f"Could not store the credential (Windows error {ctypes.get_last_error()}).")
+    print(f"Stored {len(key)} characters as '{target}'. Now run: python bin/litellm check")
 
 
 def main():
     cmd = sys.argv[1] if len(sys.argv) > 1 else "check"
+    if cmd == "store":
+        if sys.platform != "win32":
+            fail(1, "store is for Windows. Mac: security add-generic-password -s ursula-litellm -a \"$USER\" -w")
+        store_windows(KEYCHAIN_SERVICE)
+        return
     if cmd == "check":
         models = request("/v1/models", timeout=30)
         info = request("/key/info", timeout=30).get("info", {})

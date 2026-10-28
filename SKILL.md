@@ -100,6 +100,8 @@ instance changes a meeting the other organises.
    `docs/setup.md`, do the interview, and satisfy its **completion contract** before
    anything else. Never guess project keys or cadence.
    If `config/run.status` is `incomplete`, say what is missing and fix that first.
+   If `config/run.home` names another host, this store is retired: stop and say
+   where Ursula now lives (`docs/setup.md`, "Moving hosts").
 2. **Confirm connectors.** Jira, Google Drive, Gmail and Calendar must be readable,
    along with Slack for the full cadence. Prove each with a read, not by the name of
    a connector. If Jira is missing, stop and say so — see `docs/troubleshooting.md`,

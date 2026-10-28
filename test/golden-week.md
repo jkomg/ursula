@@ -433,3 +433,21 @@ the review ran on LiteLLM `gpt-6-sol`. Six findings:
 **Not proven.** No check-in or cadence has run the antagonist. Codex hooks are
 absent. The LiteLLM key is not yet stored on this machine. Whether the claude.ai
 sandbox could reach the gateway was not tested.
+
+## 2026-10-28 — A stored key that was one control character; moving hosts
+
+**Symptom.** After the operator stored the LiteLLM key with the documented credential
+command, `bin/litellm check` got a bare HTTP 400 page from the gateway. The stored
+secret was a single non-printable character: in a classic Windows console, Ctrl+V at a
+hidden prompt types a control character instead of pasting. Nothing said so.
+
+**Fix.** `bin/litellm store` prompts with hidden input, refuses control and non-ASCII
+characters, and writes the credential itself. It refuses to run without a real console:
+`isatty()` is true for NUL on Windows, and an agent's shell hung on the prompt until
+`GetConsoleMode` was added. On a rejected request, `check` reports the key's length and
+character classes, never its value. After re-storing: key accepted, 218 models.
+
+**Moving hosts.** The operator wanted the live claude.ai board after setting up on a
+desktop host. The board needs claude.ai's artifact database, so state cannot be shared;
+`docs/setup.md` now has a one-way move with re-verification, and `config/run.home`
+retires the old store so two primaries cannot diverge. Not yet run in claude.ai.

@@ -34,10 +34,10 @@ antagonist is recorded as pending (`reference/delegation.md`).
 
    | System | Command |
    |---|---|
-   | Windows | `cmdkey /generic:ursula-litellm /user:litellm /pass` |
+   | Windows | `py -3 bin\litellm store`, or without the `py` launcher, `& "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe" bin\litellm store` in PowerShell. Paste with right-click: in a classic console, Ctrl+V types a control character, and the store refuses it |
    | Mac | `security add-generic-password -s ursula-litellm -a "$USER" -w` |
 
-   Then run `python bin/litellm check`. It should say `"key": "accepted"`. Use
+   Then run `py -3 bin\litellm check` (Mac: `python3 bin/litellm check`). It should say `"key": "accepted"`. Use
    `LITELLM_BASE_URL` if your gateway is not the Mirantis one. In T3 you can add the
    gateway as a provider instead; setup records whichever route you verify.
 6. New setup: say "Set up Ursula". Existing setup: say "Ursula, check my setup after the

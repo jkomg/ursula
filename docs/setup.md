@@ -236,6 +236,31 @@ Ask Claude to read back your config. Confirm:
 - Undated items are at the bottom where they belong — that is correct behaviour,
   not a bug
 
+## Moving hosts (desktop to claude.ai)
+
+Neither host inherits the other's state, and two live stores diverge. A move is
+therefore deliberate, one way, and re-verified. It was first used on 2026-10-28, when an
+operator set up on a desktop host and then wanted the live claude.ai board.
+
+1. **On the old host,** write an import file: the `config` and `state` collections plus
+   `runs`, `findings`, `hires` and `changesets`, keyed by document id, as in
+   `reference/runtime.md`. Set `config/run.status` to `incomplete` in the import, with the
+   claude.ai checks listed as missing. Then mark the old store retired (`config/run.home`
+   names the new host). A session that finds its store retired stops and says where
+   Ursula now lives.
+2. **In claude.ai,** upload the current skill zip. In a fresh chat, attach the import
+   file and say "Move my Ursula here". Confirm the claude.ai account belongs to the
+   import's organization (`config/context`) before reading the file.
+3. Claude writes each document with `write_db` and reads every one back. A document
+   that does not read back identically is reported, not assumed.
+4. Re-run the verification table in 3b, rows 1 to 6, in claude.ai. The old host's
+   connector checks do not transfer: different host, possibly different accounts.
+5. Publish the board (row 8). Then do the readback (row 9) and mark setup complete.
+
+What does not move: hooks, the call ledger and the LiteLLM antagonist. claude.ai
+cannot run them, so the antagonist records `pending` (`reference/delegation.md`). The
+private policy file and the old state stay on the old machine as a retired archive.
+
 ## Multiple operators
 
 Two managers can run Ursula against overlapping boards. Each has their own skill
