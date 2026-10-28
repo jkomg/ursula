@@ -147,14 +147,15 @@ def store_windows(target):
     from ctypes import wintypes
 
     # isatty() is True for NUL on Windows, so ask the console itself: GetConsoleMode fails
-    # unless stdin is a real interactive console (observed hanging an agent's shell).
+    # unless stdin is a real interactive console (observed hanging an agent's shell). This
+    # only stops non-interactive callers; bin/guard-secrets is what denies an agent running it.
     k32 = ctypes.WinDLL("kernel32", use_last_error=True)
     k32.GetStdHandle.restype = wintypes.HANDLE
     mode = wintypes.DWORD()
     if not (sys.stdin.isatty() and k32.GetConsoleMode(k32.GetStdHandle(-10), ctypes.byref(mode))):
         fail(1, "store must be run by you in your own terminal, not by an agent.")
     key = getpass.getpass("LiteLLM key (input hidden; paste with right-click or Ctrl+Shift+V): ")
-    key = key.strip("\x00 \t\r\n")
+    key = key.strip(" \r\n")   # trim paste spacing only; NUL, tab and other controls are refused below
     if not key or any(not (33 <= ord(c) <= 126) for c in key):
         fail(1, f"That input has {len(key)} characters including control or non-ASCII ones, so it is "
                 "not a key. In a classic console Ctrl+V types a control character; paste with "

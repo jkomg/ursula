@@ -451,3 +451,11 @@ character classes, never its value. After re-storing: key accepted, 218 models.
 desktop host. The board needs claude.ai's artifact database, so state cannot be shared;
 `docs/setup.md` now has a one-way move with re-verification, and `config/run.home`
 retires the old store so two primaries cannot diverge. Not yet run in claude.ai.
+
+**Review of the above** (LiteLLM `gpt-6-sol`, run through `bin/litellm chat`, the first use
+of the direct route). Two findings, both accepted:
+1. A console check cannot prove the operator is typing; an agent's interactive shell
+   passes it. `guard-secrets` now denies any agent command that runs the key store. The
+   live hook was seen denying it.
+2. Stripping NUL and tab before validation stored them instead of refusing. Only
+   spaces and line breaks are trimmed now.
