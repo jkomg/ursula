@@ -60,6 +60,15 @@ ChatGPT/Codex has no check-ins and no outbox that sends. Keep the outbox shape i
 the export so proposals are recorded, and give the operator each message's exact text
 to send themselves. Never claim a message was sent.
 
+## Sub-agents and switching primary
+
+Sub-agent tools differ by host: Claude Code's agent tool, Codex's agent spawn, or T3
+`delegate_task` for another provider. claude.ai and ChatGPT web chats have none
+today; there the primary does the work inline. Switching primary is a host action
+(T3 provider handoff, or the operator opening the other app). The skill makes it
+safe through `state/handoff`, but only between hosts that read the same state store.
+See `reference/delegation.md`.
+
 ## Tool translations
 
 | Existing reference | Host-neutral requirement |

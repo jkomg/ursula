@@ -19,6 +19,9 @@ independent reviewer. Keep each profile's accounts, connectors and state separat
 The same interview applies in Claude, ChatGPT/Codex, Gemini and T3; only verified
 host capabilities are usable. Existing users must identify their current state's
 organization before migration; never automatically label old data Mirantis.
+The same step asks which Claude, ChatGPT/Codex and LiteLLM accounts the operator
+has, which runs first, and which reviews. Connecting an account happens in the
+host; the interview only records and verifies it.
 
 ## 1. Install
 

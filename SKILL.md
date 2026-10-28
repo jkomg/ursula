@@ -40,6 +40,11 @@ user chat requests such as `Ursula --profile iren --agent codex`; they request a
 verified route, not a login change. A cross-organization switch requires a clean
 chat/project with no transfer of prior context. Missing policy means setup-only.
 
+Where the host can start sub-agents, the primary sends bulk reads to read-only
+workers and keeps reconcile, analysis, approvals and writes for itself. It saves
+`state/handoff` so another approved primary can take over mid-run. Read
+`reference/delegation.md` before a cadence and whenever you resume someone else's run.
+
 ## Mode
 
 Read `config/run.mode` before doing anything that writes.
@@ -316,6 +321,7 @@ own board.
 | `docs/routine.md` | Turning check-ins on, and the routine's prompt. |
 | `reference/runtime.md` | Before setup or a cadence. Host tools, state and board adapter. |
 | `reference/run-recovery.md` | Every mine and write batch. Bounded windows and partial-run recovery. |
+| `reference/delegation.md` | Every cadence, and on taking over a run. Workers, handoff, reviewer fallback. |
 | `docs/chatgpt.md` | Installing or setting up in ChatGPT/Codex. |
 | `docs/setup.md` | First run, or onboarding a new operator. |
 | `docs/sandbox.md` | Before the first run anywhere. Modes, prohibitions, how to test. |

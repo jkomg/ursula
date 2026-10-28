@@ -83,3 +83,84 @@ class PolicyTests(unittest.TestCase):
             p[field] = value
             with self.assertRaises(ValueError):
                 m.validate(p)
+
+
+class PolicyV2Tests(unittest.TestCase):
+    def policy(self):
+        return dict(version=2, profile='mirantis', organization='mirantis',
+                    allowed_agents=['claude-code', 'codex', 'mirantis-litellm'],
+                    primary_order=['claude-code', 'codex'],
+                    review_order=['codex', 'claude-code', 'mirantis-litellm'],
+                    allow_mirantis_litellm=True)
+
+    def test_primary_failover_in_order(self):
+        self.assertEqual(m.route(self.policy())['requested_agent'], 'claude-code')
+        self.assertEqual(m.route(self.policy(), unavailable=('claude-code',))['requested_agent'], 'codex')
+        with self.assertRaises(ValueError):
+            m.route(self.policy(), unavailable=('claude-code', 'codex'))
+
+    def test_reviewer_is_other_family_then_gateway(self):
+        self.assertEqual(m.reviewer(self.policy(), 'claude-code')['reviewer'], 'codex')
+        self.assertEqual(m.reviewer(self.policy(), 'codex')['reviewer'], 'claude-code')
+        r = m.reviewer(self.policy(), 'claude-code', ('codex',))
+        self.assertEqual(r['reviewer'], 'mirantis-litellm')
+        self.assertTrue(r['verify_model_family'])
+        with self.assertRaises(ValueError):
+            m.reviewer(self.policy(), 'claude-code', ('codex', 'mirantis-litellm'))
+
+    def test_gateway_cannot_be_primary(self):
+        p = self.policy()
+        p['primary_order'] = ['mirantis-litellm', 'codex']
+        with self.assertRaises(ValueError):
+            m.validate(p)
+        with self.assertRaises(ValueError):
+            m.route(self.policy(), agent='mirantis-litellm')
+
+    def test_every_primary_needs_other_family_reviewer(self):
+        p = self.policy()
+        p['review_order'] = ['codex']
+        p['primary_order'] = ['claude-code', 'codex']
+        with self.assertRaises(ValueError):
+            m.validate(p)
+
+    def test_generic_litellm_any_org_but_mirantis_one_stays_scoped(self):
+        p = dict(self.policy(), profile='personal', organization='personal', allow_mirantis_litellm=False,
+                 allowed_agents=['claude-code', 'chatgpt', 'litellm'], primary_order=['claude-code'],
+                 review_order=['chatgpt', 'litellm'])
+        m.validate(p)
+        p['allowed_agents'].append('mirantis-litellm')
+        with self.assertRaises(ValueError):
+            m.validate(p)
+
+    def test_v2_rejects_v1_fields_and_unlisted_agents(self):
+        p = self.policy()
+        p['default_agent'] = 'codex'
+        with self.assertRaises(ValueError):
+            m.validate(p)
+        p = self.policy()
+        p['review_order'] = ['gemini']
+        with self.assertRaises(ValueError):
+            m.validate(p)
+
+    def test_cli_review_route(self):
+        import json, subprocess, sys, tempfile
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d)/'policy.json'
+            path.write_text(json.dumps(self.policy()))
+            out = subprocess.run([sys.executable, str(Path(m.__file__)), str(path), '--review-for', 'claude-code',
+                                  '--unavailable', 'codex'], capture_output=True, text=True)
+            self.assertEqual(out.returncode, 0, out.stderr)
+            self.assertEqual(json.loads(out.stdout)['review']['reviewer'], 'mirantis-litellm')
+            bad = subprocess.run([sys.executable, str(Path(m.__file__)), str(path), '--unavailable', 'nobody'],
+                                 capture_output=True, text=True)
+            self.assertEqual(bad.returncode, 1)
+
+    def test_explicit_agent_respects_order_and_availability(self):
+        p = self.policy()
+        p['allowed_agents'].append('gemini')
+        with self.assertRaises(ValueError):
+            m.route(p, agent='gemini')
+        with self.assertRaises(ValueError):
+            m.route(self.policy(), agent='codex', unavailable=('codex',))
+        with self.assertRaises(ValueError):
+            m.reviewer(p, 'gemini')

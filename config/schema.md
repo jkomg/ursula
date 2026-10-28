@@ -182,6 +182,21 @@ The four things every run must end with (`SKILL.md`, "What good looks like") map
 board marks a run that left any of them out as *not recorded*, so a tidy-looking entry
 with no coverage list reads as incomplete rather than clean.
 
+### `state/handoff`
+
+Written by the primary after each pass, around each write and when it stops to ask
+(`reference/delegation.md`). One document, replaced each time.
+
+```json
+{"run_id": "2026-11-02-plan", "holder": {"agent": "claude-code", "model": "...",
+ "since": "ISO"}, "pass": "pass-3-analyse", "window": {"start": "ISO", "end": "ISO"},
+ "changeset": "changesets/<run-id> or null", "open_questions": ["..."],
+ "next": "one sentence", "updated_at": "ISO"}
+```
+
+A pointer into other records, never a copy of findings or receipts. A new primary
+reads it before anything else; it does not prove the previous holder has stopped.
+
 ### `changesets/<run-id>`
 
 An approved write batch and its receipts, for sandbox/live only. See
@@ -256,8 +271,13 @@ its own separate store; `config/context` records organization, project binding a
 requested agent. See `reference/organization-profiles.md`. Existing state without
 context is unknown until the operator identifies it; do not silently migrate it.
 
+`config/profiles` also records, per agent source, the plan the operator named and,
+for a gateway, the explicit model and the model actually returned by the verification
+call. No endpoint keys.
+
 The shared project manifest uses the exact fields validated by
-`scripts/project_policy.py`: version (1), profile, organization, allowed_agents, default_agent,
-review_agent, allow_mirantis_litellm. Run records include organization, actual
+`scripts/project_policy.py`. Version 2: version, profile, organization, allowed_agents,
+primary_order, review_order, allow_mirantis_litellm. Version 1 has default_agent and
+review_agent instead of the two orders. Run records include organization, actual
 provider/model and account verification method; never treat a requested agent as
 proof that it executed. Configuration flags do not grant permissions.

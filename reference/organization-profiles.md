@@ -14,13 +14,27 @@ Ask before connecting to organization data:
 2. “Which organization owns this project?” Bind this project to exactly one profile.
    For mixed work, use separate projects/state stores; do not merge organizations.
 3. “Which agents may handle this organization's data: Claude Code, Codex/ChatGPT,
-   Gemini, local Ollama through OpenCode, or Mirantis LiteLLM for Mirantis only?” Record only
-   explicitly approved sources. Hosting in the same app does not confer approval.
+   Gemini, local Ollama through OpenCode, your own LiteLLM gateway, or Mirantis
+   LiteLLM for Mirantis only?” Record only explicitly approved sources. Hosting in
+   the same app does not confer approval.
 4. For each selected source, ask which account/workspace belongs to it; verify the
    actual signed-in identity and workspace using supported account controls. Let
    users complete login/MFA themselves. Never collect passwords or tokens in chat.
-5. Choose primary and independent reviewer, and whether local models are permitted.
-   Verify local execution, model and backend; OpenCode can also call hosted models.
+5. Ask which plan each account is on (for example Claude Max, ChatGPT Business).
+   Record it as a hint for ordering, not an entitlement. Then choose:
+   - **primary order**: who runs the cadence, and who takes over when the first
+     runs out of budget or context. Put the higher-allowance account first. A
+     gateway cannot be primary; it holds no connectors.
+   - **review order**: reviewers to try in turn. The first one from a different
+     provider family than the acting primary is used, so list both main providers
+     and put a LiteLLM gateway last as the automatic fallback.
+   - whether local models are permitted.
+   For a LiteLLM gateway the operator configures the endpoint and key in the host
+   (a T3 provider instance, or their own client), never in chat. Name the model
+   explicitly, then run one bounded call and record the model actually returned.
+   An advertised default is not a verified model. Verify local execution, model and
+   backend the same way; OpenCode can also call hosted models.
+   How the orders are used: `reference/delegation.md`.
 6. Choose a separate private state location/board for each profile. Bind connector
    accounts, project IDs, schedules, receipts, outbox, caches, watermarks and usage
    records to that profile. Reuse no credentials or state across organizations.
@@ -36,15 +50,19 @@ as project knowledge in a web host). Example, replace choices during setup:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "profile": "iren",
   "organization": "iren",
-  "allowed_agents": ["claude-code", "codex", "ollama"],
-  "default_agent": "codex",
-  "review_agent": "claude-code",
+  "allowed_agents": ["claude-code", "codex", "litellm", "ollama"],
+  "primary_order": ["claude-code", "codex"],
+  "review_order": ["codex", "claude-code", "litellm"],
   "allow_mirantis_litellm": false
 }
 ```
+
+Version 1 (`default_agent` and `review_agent` in place of the two orders) still
+validates and behaves as a one-entry order with no failover. Write version 2 for new
+setups.
 
 Use distinct lowercase profile slugs for separate accounts/projects, even within
 one organization (for example personal-home and personal-volunteer). The --profile
@@ -52,7 +70,9 @@ flag matches the project-bound profile slug, not just its organization. Switchin
 profiles requires a clean chat/state boundary even when organization names match.
 Use lowercase organization slugs; `personal`, `iren`, `mirantis`, or an explicit
 custom slug. Source names: `claude-code`, `codex`, `chatgpt`, `gemini`, `ollama`,
-`mirantis-litellm`. The last is permitted only for Mirantis and only when opted in.
+`litellm`, `mirantis-litellm`. `litellm` is the operator's own gateway, bound to this
+profile's organization like any other account. `mirantis-litellm` is permitted only
+for Mirantis and only when opted in.
 Do not store email addresses, credentials, endpoint secrets or private state paths
 in this shared policy. A manifest is an intent declaration, not an access control.
 Use `scripts/project_policy.py` to validate it and check a requested route locally.

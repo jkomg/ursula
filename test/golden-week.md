@@ -361,3 +361,30 @@ silent-green runs. Not yet proven: that the PostToolUse hook receives `tool_resp
 writable there, and that a real check-in follows the close-out. First thing to read after
 the next check-in: its `ledger` block and `verified.ok`; if `calls` is 0 the hook is not
 running on that environment and every run will report `partial` (correctly).
+
+## 2026-10-28 — Delegation, primary failover and reviewer fallback
+
+**Symptom.** Mid-setup, the Codex primary hit its workspace spend cap during a
+calendar change. T3 handed the thread to Claude with a summary; whether the write had
+landed was known only because a receipt had been saved to private state first. A
+full cadence also loads every source into one context.
+
+**Change.** `reference/delegation.md`: read-only workers mine per source and write
+their own raw-input file for the receipt gate; the primary keeps reconcile, analysis,
+approvals and writes, and saves `state/handoff` from the frozen window onwards.
+Project policy version 2 adds `primary_order`, `review_order` and a generic `litellm`
+source any organization can bind; the setup interview asks for each account and
+plan. Version 1 policies still validate.
+
+**Review.** Codex attempted first and failed on the spend cap; the fallback ran on
+Mirantis LiteLLM `gpt-6-sol` (returned model confirmed). Five findings, all
+accepted: takeover needs a shared state store (claude.ai artifact DB and Codex files
+are not); workers must freeze source text, not just quotes; an explicit `--agent`
+bypassed the order and the unavailable list (fixed, tested); a GPT gateway cannot
+review a Codex primary (now explicit: pending); first checkpoint must precede
+mining. 30 helper tests and both-target package checks pass.
+
+**Not proven.** No cadence has run with workers or a mid-run takeover. First test:
+a dry-run Monday in T3 with Claude primary and per-source workers; then stop the
+primary after Pass 1 and resume in Codex from `state/handoff`.
+
