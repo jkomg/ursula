@@ -234,3 +234,26 @@ each other.
 
 Config is per-operator. Two operators watching the same boards have two separate
 configs and two separate databases. Jira is the only shared state.
+
+## Source provenance
+
+New actionable items, findings and proposed changes require `source_receipts` with
+`source_type`, `source_id`, `sha256` and nonempty `exact_quote`. See
+`reference/source-receipts.md` for the frozen input/proposal contract and gate.
+Store private source excerpts outside shared board rows; shared rows may link to
+receipts only when the audience is authorized to read the underlying source.
+
+## Organization context
+
+`config/profiles` is a private registry, outside bundles: profile name, organization
+slug, allowed agent sources, account/workspace verification observations (method
+and time), and state-store reference. Store no tokens/passwords. Each profile has
+its own separate store; `config/context` records organization, project binding and
+requested agent. See `reference/organization-profiles.md`. Existing state without
+context is unknown until the operator identifies it; do not silently migrate it.
+
+The shared project manifest uses the exact fields validated by
+`scripts/project_policy.py`: version (1), profile, organization, allowed_agents, default_agent,
+review_agent, allow_mirantis_litellm. Run records include organization, actual
+provider/model and account verification method; never treat a requested agent as
+proof that it executed. Configuration flags do not grant permissions.

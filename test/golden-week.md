@@ -278,3 +278,42 @@ operator, and propose → approve on the board → Gmail send with the receipt k
   final line is the notification. Email-to-self and the Slack DM log are optional and
   need the guard settings on the routine's environment; without them every connector
   write is blocked, confirmed on the first check-in (`guard: active`, cloud: true).
+
+## 2026-10-27 — source receipt gate (local helper validation)
+
+Added private input capture through a configured read-only adapter, exact source
+hashes, run IDs, quote membership checks, strict required fields and duplicate-ID
+rejection. Weekly and always-on instructions require the receipt gate before
+external writes and watermark advancement. Added a portable independent auditor
+prompt; it is not an automatically registered agent. Mirantis review is restricted
+to authorized Mirantis inputs and an active Mirantis provider.
+
+13 local helper tests passed, including changed text, absent sources, mismatched
+runs, whitespace quotes, empty receipts, duplicate IDs/JSON fields, partial coverage,
+exact file hashes and nonzero CLI failure without raw content. Existing snapshot
+renderer tests also passed. `bin/install.sh --target all --check` passed. The local
+OpenCode builder was interrupted after exceeding its budget; the lead fixed the
+draft and invalid fixture hashes. Independent review remains pending.
+
+No real connector ingestion, board write, cadence run or hosted auditor was tested.
+No production watermark advanced. Adapter execution does not prove completeness or
+authenticity; quote membership does not prove semantic support. The host workflow
+must invoke the gate; arbitrary direct connector or board UI writes are not
+technically intercepted. No personal input artifacts were added to the bundle.
+
+## 2026-10-27 organization routing update
+
+Added multi-profile setup, single-organization project binding, conversational
+profile/agent requests and private state separation. Added a deterministic manifest
+validator; this validates policy intent, not account identity or live routing.
+Claude/ChatGPT/Gemini/T3 end-to-end profile transitions and live connector ownership
+checks remain unverified. No live state or accounts migrated.
+
+Local validation: 22 helper tests passed, including cross-profile rejection,
+Mirantis-only LiteLLM opt-in, distinct provider families, duplicate JSON keys,
+malformed/oversize CLI inputs and explicit pending-identity output. Bundle checks
+passed. A bounded local qwen3-coder:30b design attempt asked for direction rather
+than completing review and was cancelled. IREN Claude Sonnet 5.5 reviewed the
+implementation; first-round gaps were addressed with profile IDs distinct from
+organization, real-manifest testing in the IREN app and broader negative tests.
+No token savings or live identity/switching verification is claimed.

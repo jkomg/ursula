@@ -70,3 +70,11 @@ cloud environment **API credential**, which the proxy attaches outside the sessi
 That option appears when you edit your own cloud environment on Pro and Max plans; on
 Team and Enterprise plans it is not available yet. Until it is, check-ins run without
 LiteLLM. Never paste the key into a chat, a prompt or the environment-variables box.
+
+## Input capture and receipt gate
+
+Read `reference/source-receipts.md` before mining. Use a configured read-only
+adapter through `scripts/fetch_inputs.py`, or capture actual host connector results
+with the same contract. No connector adapter is bundled. Run
+`scripts/verify_receipts.py` before write-back; if the host cannot execute it,
+record verification unavailable and withhold writes and completion.

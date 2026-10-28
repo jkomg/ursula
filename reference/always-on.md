@@ -147,3 +147,13 @@ It read two new notes documents and one DM reply, skipped three candidates that 
 had tickets, raised one finding (a collision tomorrow at 10), proposed one focus block
 and one email reply, and at `quiet` ended with the line the operator's phone showed: "Ursula: 1 finding,
 2 things need your OK". Total time, a few minutes.
+
+## Receipt gate for check-ins
+
+Apply `reference/source-receipts.md` to each check-in as well as weekly passes.
+Freeze the actual reads with a unique run ID and explicit coverage. Validate the
+proposal receipts immediately before external writes or watermark advancement.
+A failed or unavailable gate blocks those actions. Preserve dry-run and approval
+rules. Record incomplete coverage and pending independent review; neither is a
+successful completed cadence. The board's independent UI is not intercepted by
+this command-line check.

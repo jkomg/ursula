@@ -31,6 +31,15 @@ answer), and how to publish the board there. Read it before setup or a cadence, 
 follow it wherever this file says "read the state store" or "update the board".
 Host differences belong in that file, not here: one cadence, one set of checks.
 
+## Organization and agent source
+
+Before reading private project data, follow `reference/organization-profiles.md`.
+Ask which profiles to configure (Mirantis, IREN, personal or custom), bind each
+project to one, and verify approved accounts and connectors. Recognize explicit
+user chat requests such as `Ursula --profile iren --agent codex`; they request a
+verified route, not a login change. A cross-organization switch requires a clean
+chat/project with no transfer of prior context. Missing policy means setup-only.
+
 ## Mode
 
 Read `config/run.mode` before doing anything that writes.
@@ -78,6 +87,9 @@ instance changes a meeting the other organises.
 
 ## Before anything else
 
+0. **Verify organization.** Read the project policy and profile context; recheck
+   accounts and allowed agent sources per `reference/organization-profiles.md`.
+   State the organization and actual agent alongside run mode.
 1. **Load config.** Read `config/*` from the state store. No config means this is
    a first run — go to
    `docs/setup.md`, do the interview, and satisfy its **completion contract** before
@@ -123,6 +135,9 @@ match each to a notes source, and report the ones with no source by name. Measur
 automated mining found the origin of one ticket in six — the rest came from meetings
 that produced no reachable notes at all. The unmatched list is what Pass 0 is for, and
 a mining pass reported without it is a false clean bill of health.
+
+Before reconciliation, capture source receipts following `reference/source-receipts.md`.
+Do not reconstruct evidence from memory. Missing capture is a partial run.
 
 ### Pass 2 — reconcile
 
@@ -180,6 +195,10 @@ Apply the accepted tags — the label plus the current week tag — and write th
 and priorities agreed in the same pass.
 
 ### Pass 5 — write back
+
+Run the receipt gate in `reference/source-receipts.md` before any external write.
+A failed or unavailable gate blocks write-back and watermark advancement.
+
 
 In `dry-run`, emit the changeset and stop: no Jira or Calendar writes and no
 one-pager staging comment. The run log and findings below are still written — they

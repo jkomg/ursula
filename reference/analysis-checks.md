@@ -184,3 +184,9 @@ self-blocking this week" is information, and its absence makes the operator wond
 whether the check ran at all. A check that could not run — a space unreachable, a field
 the connector does not return — goes under *what could not be done*, never under
 *clean*.
+
+## Evidence verification
+
+Before reporting checks clean or executing write-back, follow
+`reference/source-receipts.md`. Deterministic quote membership and optional
+adversarial entailment review are different checks; report both outcomes separately.

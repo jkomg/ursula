@@ -148,3 +148,18 @@ We watch some of the same boards, so a couple of rules keep us out of each other
 `docs/troubleshooting.md`. The most common one by far: Claude says it has no Jira
 access while your board still works fine. Those are two different permissions and the
 fix is in there.
+
+## Organization setup
+
+After loading the skill, start with:
+
+> Set up Ursula profiles. Ask whether I need Mirantis, IREN, personal or multiple
+> organizations, then bind this project to one profile. Verify its approved agent
+> accounts and connectors before reading private data. Follow
+> reference/organization-profiles.md.
+
+Later, use `Ursula --profile iren --agent codex` (substitute your configured profile
+and approved agent). This is a request the skill interprets, not a native chat-app
+command or automatic login switch. Use a clean chat when changing organizations.
+
+For a Mirantis-only Windows machine, follow `docs/windows-mirantis.md`.

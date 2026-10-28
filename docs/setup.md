@@ -10,6 +10,16 @@ into your artifact database, and publishes your board.
 
 Expect fifteen minutes.
 
+## 0. Organization and agents
+
+Before connector setup, follow `reference/organization-profiles.md`. Ask: “Is this
+for Mirantis, IREN, a personal account, or another organization? You can configure
+one or more.” Bind this project to one profile and select approved agents and an
+independent reviewer. Keep each profile's accounts, connectors and state separate.
+The same interview applies in Claude, ChatGPT/Codex, Gemini and T3; only verified
+host capabilities are usable. Existing users must identify their current state's
+organization before migration; never automatically label old data Mirantis.
+
 ## 1. Install
 
 Add the skill through the Skills menu in claude.ai and run the Monday and Thursday
@@ -19,8 +29,10 @@ database (`docs/routine.md`). The repo is where the skill is edited.
 
 ## 2. Turn on connectors
 
-All four are required. If any is missing you will get a partial run that looks like
-a complete one.
+The required capabilities are listed below. Use only connectors authorized for the
+selected organization; the Mirantis gateway is a Mirantis example, not a dependency
+for IREN or personal profiles. Equivalent connectors are acceptable after real
+identity and read checks. Missing capabilities make setup incomplete.
 
 | Connector | Used for |
 |---|---|
@@ -126,7 +138,9 @@ below is true. Claude must not report setup as complete otherwise.
 
 ### Required state
 
-Eleven documents, every field populated or explicitly recorded as unknown with a reason:
+The profile registry and bound profile context (`config/profiles` and
+`config/context`), plus these eleven documents, with every field populated or
+explicitly recorded as unknown with a reason:
 
 `config/jira` · `config/labels` · `config/cadence` · `config/numbers` ·
 `config/people` · `config/policies` · `config/packs` · `config/run` · `config/voice` ·
@@ -137,6 +151,10 @@ are off, which is a valid setup.
 
 A field left out silently is a failure. A field recorded as `null` with a note saying
 why is acceptable and gets reported.
+
+Organization verification must precede the reads below: confirm project binding,
+approved primary/reviewer sources, account/workspace evidence, connector ownership
+and separate state storage. Unknown identity blocks private connector reads.
 
 ### Verification — by execution, never by assertion
 

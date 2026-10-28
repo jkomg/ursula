@@ -138,3 +138,17 @@ Queued work, in rough priority order:
 - Every rule states its consequence
 - Defects get logged with the symptom, the fix, and the observation that produced it
 - Commit messages describe the decision, not the file list
+
+<!-- coding-harness review workflow -->
+## Task and code review
+
+Before accepting substantive task plans or delivering code, follow
+[the review workflow](.review-harness/assets/adversarial-review.md). Preserve all
+existing project checks, approval gates and credential rules. Use deterministic
+checks and a bounded local reviewer first; Mirantis LiteLLM is limited to verified
+Mirantis-authorized work. Personal/IREN work stays local or account-matched.
+Record findings and fixes or rebuttals; at most two automatic repair/review rounds.
+Unexecuted review remains pending. Model agreement does not establish correctness.
+The portable packet helper is `.review-harness/scripts/review.py`; it sends nothing
+until explicitly invoked with `send` after account and content verification.
+<!-- end coding-harness review workflow -->
