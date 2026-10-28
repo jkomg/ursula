@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+"""PreToolUse hook: keep the check-in's own tools away from the ledger.
+
+bin/ledger-log writes the ledger; the model should only ever read it through
+scripts/checkin_close.py. This denies Bash, Write and Edit calls that name the ledger
+directory, while the guard applies (same rule as bin/guard-actions).
+
+It is a speed bump, not a wall: a command can build the path from pieces, and a process
+running as the same user can always write the file. It catches the plain routes and
+leaves a denial in the transcript when the model tries one. The chain hash in the
+ledger and an off-machine copy of its head (docs/governance.md) are what catch the rest.
+"""
+import json
+import os
+import sys
+
+ROLE = os.environ.get("URSULA_ROLE", "").strip()
+REMOTE = os.environ.get("CLAUDE_CODE_REMOTE", "").strip().lower() not in ("", "0", "false")
+LEDGER = os.environ.get("URSULA_LEDGER", "").strip() or "/var/tmp/ursula-ledger/ledger.jsonl"
+if not (ROLE == "checkin" or (not ROLE and REMOTE)):
+    sys.exit(0)
+try:
+    ev = json.load(sys.stdin)
+except ValueError:
+    sys.exit(0)
+
+inp = ev.get("tool_input") or {}
+text = " ".join(str(inp.get(k, "")) for k in ("command", "file_path", "path", "content", "new_string"))
+folder = os.path.dirname(LEDGER)
+if folder in text or LEDGER in text or "ursula-ledger" in text:
+    # Reading it through the close script is allowed: that script's own path is not the ledger's.
+    if "checkin_close.py" in text or "checkin_verify.py" in text:
+        sys.exit(0)
+    print(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "Ledger guard: the call ledger is written by the harness and is not for "
+                                    "editing or reading directly. Use scripts/checkin_close.py.",
+    }}))
+sys.exit(0)

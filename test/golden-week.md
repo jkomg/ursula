@@ -317,3 +317,47 @@ than completing review and was cancelled. IREN Claude Sonnet 5.5 reviewed the
 implementation; first-round gaps were addressed with profile IDs distinct from
 organization, real-manifest testing in the IREN app and broader negative tests.
 No token savings or live identity/switching verification is claimed.
+
+## 2026-10-26 / 27 — check-in coverage defects (live board, from the run log)
+
+Found by the operator asking why a "0 notes, 0 DMs" line meant anything, then reading the
+runs collection. Four defects in four check-ins:
+
+- **Skipped sources recorded as complete.** The 16:11 check-in listed two new notes
+  documents by title, skipped Gmail, wrote `complete` and advanced the watermark; the
+  summary line said nothing needed the operator. The 12:09 check-in listed 25 of about
+  200 message ids and triaged none, and did not use Slack at all. Fix: Drive notes,
+  Gmail and the Slack DM are required sources; a run that skipped any is `partial`,
+  leaves the watermark, and says so in the final line at every level.
+- **Open findings dropped.** The 27 Oct 08:27 check-in wrote `findings_carried: 0`,
+  `calendar-collision-today` clean and "nothing due today" while four findings were open,
+  including an 11:30 collision that morning and a review due close of business. Fix: the
+  open set is re-evaluated first on every run, imminent findings are always named in the
+  final line, and a check cannot be listed clean while an open finding of it exists.
+- **Findings never closed.** Fifteen collision and due-date findings from weeks 40 to 43
+  were still `open` on 27 Oct. Fix: a cause that is plainly gone is closed by the
+  check-in with a `close_note`.
+- **Expired outbox item left unmentioned** (12:09 run, item from 8 Oct). Fix: counted
+  and named in the summary and final line.
+
+New: `scripts/checkin_verify.py` checks a run record against the open findings. Run
+against the two live records above it fails both, for the reasons listed. Run against a
+constructed good record it passes, and fails the same record when `could_not` admits an
+unread source. It checks that a record is consistent, not that the sources were read.
+No claude.ai run of the new rules yet.
+
+### Same day: harness-written evidence (hooks and scripts, no claude.ai run)
+
+Added `bin/ledger-log` (PostToolUse), `bin/guard-ledger`, `scripts/checkin_close.py`,
+`scripts/audit_trend.py` and `docs/governance.md`. Exercised here against synthetic hook
+events (our own code, not a connector): the ledger chains and records errors; a run that
+claims 5 documents and 9 mails when the ledger shows 2 and 1 is refused, is `partial`, gets
+no watermark and a final line that leads with the gap; deleting a ledger line is reported as
+a broken chain; the guard denies a command naming the ledger and allows the close script;
+with two findings given `due_at` the final line names both. The audit, run over the 57
+real check-in records, shows 0 verified runs, 25 to 53 per cent partial weeks and 18
+silent-green runs. Not yet proven: that the PostToolUse hook receives `tool_response` and
+`session_id` as assumed on the claude.ai cloud environment, that the ledger path is
+writable there, and that a real check-in follows the close-out. First thing to read after
+the next check-in: its `ledger` block and `verified.ok`; if `calls` is 0 the hook is not
+running on that environment and every run will report `partial` (correctly).
