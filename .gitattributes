@@ -1,0 +1,6 @@
+# Scripts run under bash and Python on every OS. A Windows checkout with
+# core.autocrlf would otherwise give them CRLF endings, which bash cannot run.
+bin/* text eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+.claude/settings.json text eol=lf

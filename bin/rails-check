@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# Check that Ursula's local rails actually run on this machine. Read-only: it feeds
+# each hook a synthetic event and reads the result; it changes no configuration.
+#
+#   bash bin/rails-check
+#
+# Why: on 2026-10-28 every hook on a Windows desktop had been failing silently for
+# as long as it had been installed (python3 was the Microsoft Store stub, and
+# ledger-log imported fcntl). Nothing reported it. A rail is only installed when
+# this script has seen it work.
+#
+# Exit status: 0 when every required rail works, 1 otherwise. LiteLLM being
+# unconfigured is a warning, not a failure: the antagonist then records "pending".
+
+set -u
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+fail=0
+ok()   { printf 'ok    %s\n' "$*"; }
+warn() { printf 'warn  %s\n' "$*"; }
+bad()  { printf 'FAIL  %s\n' "$*"; fail=1; }
+hook() { bash bin/run-hook "$@"; }
+event() { printf '{"tool_name":"%s","tool_input":{"%s":"%s"}}' "$1" "$2" "$3"; }
+
+# 1. An interpreter the hooks can use.
+if py="$(bash bin/run-hook --which 2>/dev/null)"; then ok "hook Python: $py"
+else bad "no usable Python 3.8+; every hook blocks until one is installed (or set URSULA_PYTHON)"; fi
+
+# 2. The hooks are wired to the launcher, not to a bare python3.
+if grep -q 'bin/run-hook' .claude/settings.json 2>/dev/null && ! grep -q '"python3 ' .claude/settings.json; then
+  ok ".claude/settings.json routes hooks through bin/run-hook"
+else bad ".claude/settings.json does not use bin/run-hook; hooks may fail silently on Windows"; fi
+grep -q '"Bash|PowerShell"' .claude/settings.json 2>/dev/null && ok "secret guard covers Bash and PowerShell" \
+  || bad "secret guard does not cover the PowerShell tool"
+
+# 3. guard-secrets denies key reads in both shells and allows ordinary commands.
+for e in "$(event Bash command 'echo $LITELLM_API_KEY')" "$(event PowerShell command 'Get-ChildItem env:')"; do
+  if printf '%s' "$e" | hook guard-secrets 2>/dev/null | grep -q '"deny"'; then ok "guard-secrets denies: $(printf '%s' "$e" | cut -c15-60)"
+  else bad "guard-secrets did not deny: $e"; fi
+done
+if printf '%s' "$(event Bash command 'git status')" | hook guard-secrets 2>/dev/null | grep -q deny; then
+  bad "guard-secrets denies an ordinary command"; else ok "guard-secrets allows ordinary commands"; fi
+
+# 4. guard-actions: report whether it is active here (it is meant to be off outside check-ins).
+status="$(hook guard-actions --status 2>/dev/null)" && ok "guard-actions runs: $status" || bad "guard-actions did not run"
+
+# 5. guard-ledger denies the ledger path inside a check-in.
+if printf '%s' "$(event Bash command 'cat /var/tmp/ursula-ledger/ledger.jsonl')" | URSULA_ROLE=checkin hook guard-ledger 2>/dev/null | grep -q deny; then
+  ok "guard-ledger denies direct ledger access in a check-in"; else bad "guard-ledger did not deny the ledger path"; fi
+
+# 6. ledger-log appends a hash-chained line (to a throwaway ledger).
+tmp="$(mktemp -d)"; led="$tmp/ledger.jsonl"
+command -v cygpath >/dev/null 2>&1 && led="$(cygpath -w "$tmp")\\ledger.jsonl"
+for _ in 1 2; do
+  printf '{"tool_name":"mcp__check__read","tool_input":{"id":"x"},"tool_response":{"ok":true},"session_id":"rails-check"}' \
+    | URSULA_LEDGER="$led" hook ledger-log
+done
+have_py=0; bash bin/run-hook --which >/dev/null 2>&1 && have_py=1
+py() { bash bin/run-hook --python "$@"; }
+if [ "$have_py" -eq 1 ] && py - "$led" <<'EOF' 2>/dev/null
+import hashlib, json, sys
+lines = open(sys.argv[1], 'rb').read().splitlines()
+sys.exit(0 if len(lines) == 2 and json.loads(lines[1])['prev'] == hashlib.sha256(lines[0]).hexdigest() else 1)
+EOF
+then ok "ledger-log appends a valid hash chain"; else bad "ledger-log did not write a valid chained ledger"; fi
+rm -rf "$tmp"
+
+# 7. The project policy validates and names a reviewer.
+if [ -f ursula-project.json ] && [ "$have_py" -eq 1 ]; then
+  route="$(py scripts/project_policy.py ursula-project.json 2>&1)" && ok "project policy valid: $(printf '%s' "$route" | cut -c1-90)" \
+    || bad "project policy invalid: $route"
+else warn "no ursula-project.json here; setup has not bound this checkout to a profile"; fi
+
+# 8. LiteLLM reachable for the antagonist (optional).
+if [ "$have_py" -eq 1 ]; then
+  out="$(py bin/litellm check 2>&1)"; rc=$?
+  case $rc in
+    0) ok "LiteLLM key accepted: $(printf '%s' "$out" | tr -d '\n ' | cut -c1-80)" ;;
+    2) warn "LiteLLM: no key stored. Antagonist falls back to T3 providers or records pending. See docs/desktop.md" ;;
+    *) warn "LiteLLM unreachable or refused (exit $rc); antagonist will record pending" ;;
+  esac
+fi
+
+echo
+[ "$fail" -eq 0 ] && echo "Rails check passed." || echo "Rails check FAILED: the items above are not protecting this machine."
+exit "$fail"

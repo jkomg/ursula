@@ -202,7 +202,9 @@ and priorities agreed in the same pass.
 ### Pass 5 — write back
 
 Run the receipt gate in `reference/source-receipts.md` before any external write.
-A failed or unavailable gate blocks write-back and watermark advancement.
+A failed or unavailable gate blocks write-back and watermark advancement. Then run the
+antagonist pass (`reference/delegation.md`): actions it objects to wait for the operator;
+if it cannot run, write anyway and record it as pending.
 
 
 In `dry-run`, emit the changeset and stop: no Jira or Calendar writes and no
@@ -323,6 +325,7 @@ own board.
 | `reference/run-recovery.md` | Every mine and write batch. Bounded windows and partial-run recovery. |
 | `reference/delegation.md` | Every cadence, and on taking over a run. Workers, handoff, reviewer fallback. |
 | `docs/chatgpt.md` | Installing or setting up in ChatGPT/Codex. |
+| `docs/desktop.md` | Running in T3, Claude Code or Codex on the operator's machine, with the hooks and LiteLLM. |
 | `docs/setup.md` | First run, or onboarding a new operator. |
 | `docs/sandbox.md` | Before the first run anywhere. Modes, prohibitions, how to test. |
 | `test/golden-week.md` | Regression fixture — a week processed by hand. |

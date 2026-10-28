@@ -132,6 +132,14 @@ in `could_not`.
 
 ### 4. Stage and propose
 
+Draft the findings and outbox items first, then run the antagonist pass over the drafts
+(`reference/delegation.md`) **before writing any of them**, so an objection arrives in
+time. An outbox item it objects to is not written; it goes in the final line with the
+objection, for the operator to decide. A finding it objects to is written with the
+objection attached, because findings are the operator's own record. In a claude.ai
+routine the antagonist cannot run today: record `antagonist.status: "pending"` and
+write as normal.
+
 - Findings: write them. Stage their one-pager comment as a proposal, as on any day.
 - Anything that should happen: an outbox item (`reference/outbox.md`) with the exact
   words, the reason and the source. In `dry-run` the item is written with
@@ -266,6 +274,9 @@ Apply `reference/source-receipts.md` to each check-in as well as weekly passes.
 Freeze the actual reads with a unique run ID and explicit coverage. Validate the
 proposal receipts immediately before external writes or watermark advancement.
 A failed or unavailable gate blocks those actions. Preserve dry-run and approval
-rules. Record incomplete coverage and pending independent review; neither is a
-successful completed cadence. The board's independent UI is not intercepted by
+rules. Incomplete coverage is never a successful completed cadence. An antagonist
+pass that could not run is recorded as `antagonist.status: "pending"`, named in the
+final line, and does not by itself make the run partial or hold the watermark: the
+operator chose this (2026-10-28) so that hosts with no antagonist route still
+advance. Antagonist findings left unresolved do keep the run partial. The board's independent UI is not intercepted by
 this command-line check.

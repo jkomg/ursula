@@ -175,6 +175,7 @@ check-in. The board shows the latest 52 sessions and folds check-ins under the d
 | `tags_proposed`, `tags_accepted` | Counts from the tagging sweep |
 | `findings_new`, `findings_carried` | Counts |
 | `checks_clean` | Slugs of checks that ran and found nothing |
+| `antagonist` | `{status: ran · pending, reviewer, model, reason, findings, held}`: the routine antagonist pass (`reference/delegation.md`). `model` is the one actually returned; `held` lists action ids kept back for the operator |
 | `could_not` | What could not be done, one line each. `[]` when nothing, never omitted |
 
 The four things every run must end with (`SKILL.md`, "What good looks like") map to

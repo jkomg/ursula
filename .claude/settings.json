@@ -2,11 +2,11 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/bin/guard-secrets\""
+            "command": "bash \"$CLAUDE_PROJECT_DIR/bin/run-hook\" guard-secrets"
           }
         ]
       },
@@ -15,16 +15,16 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/bin/guard-actions\""
+            "command": "bash \"$CLAUDE_PROJECT_DIR/bin/run-hook\" guard-actions"
           }
         ]
       },
       {
-        "matcher": "Bash|Write|Edit",
+        "matcher": "Bash|PowerShell|Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/bin/guard-ledger\""
+            "command": "bash \"$CLAUDE_PROJECT_DIR/bin/run-hook\" guard-ledger"
           }
         ]
       }
@@ -35,7 +35,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/bin/ledger-log\""
+            "command": "bash \"$CLAUDE_PROJECT_DIR/bin/run-hook\" ledger-log"
           }
         ]
       }

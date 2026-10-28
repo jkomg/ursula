@@ -149,3 +149,48 @@ acting primary and not unavailable.
 
 Record in the run which reviewer ran, its actual model, and which were skipped and
 why. Model agreement is not test evidence and approves nothing.
+
+## The antagonist on routine work
+
+Every write batch and every check-in also gets an antagonist pass, not just plans and
+code. That covers Jira creates, edits, transitions and comments, calendar changes, staged
+one-pager text, and the outbox proposals and finding updates a check-in makes. The
+receipt gate shows that each quote exists. The antagonist asks whether the action
+actually follows from it: wrong project or routing, a write to a watched board, a
+deadline the source never stated, a duplicate of an open ticket, an assignee guessed
+from a first name.
+
+**When:** after the operator approves the batch and the receipt gate passes, and
+before the first write. In a check-in, it runs on the drafted findings and outbox items
+before any is written (`reference/always-on.md`, pass 4).
+
+**Packet:** the changeset actions (target, current value, proposed value) and each
+action's receipts with exact quotes. Include the frozen input text only for the
+sources those receipts cite. Nothing from another organization, and no credentials.
+Ask for findings as `{action_id, problem, evidence, severity}`, or an empty list.
+
+**Route**, picked with
+`scripts/project_policy.py ursula-project.json --profile <slug> --review-for <acting primary> --unavailable <list>`:
+
+| Where Ursula runs | How the antagonist runs |
+|---|---|
+| T3 | `delegate_task` to the chosen provider instance, read-only, review role |
+| Claude Code or Codex without T3, gateway reviewer | `python bin/litellm chat <model> < packet`; the model actually served is on stderr as `[litellm] model=...` |
+| claude.ai chat or claude.ai routine | No route today: no gateway key can reach it (`docs/routine.md`, "LiteLLM (later)") |
+
+**Outcome:**
+
+- **Ran, no findings:** the batch proceeds.
+- **Ran, findings:** each action it names is held and shown to the operator with the
+  finding. Actions it did not name proceed. Never write an action the antagonist
+  objected to without the operator deciding.
+- **Could not run** (no route, spend cap, gateway down, or only a same-family model
+  available): the batch proceeds on the operator's approval and the receipt gate
+  alone. The run records `antagonist.status: "pending"` with the reason, and its
+  summary says so. A pending antagonist does not by itself make the run partial or hold
+  the watermark. Unresolved antagonist findings do. This is the operator's chosen trade-off: holding every write until
+  a review can run would stop claude.ai operators from writing at all.
+
+An antagonist's findings are evidence for the operator, not approval and not a veto
+the model can override. Record each one and what happened to it on the changeset
+action.

@@ -388,3 +388,48 @@ mining. 30 helper tests and both-target package checks pass.
 a dry-run Monday in T3 with Claude primary and per-source workers; then stop the
 primary after Pass 1 and resume in Codex from `state/handoff`.
 
+
+## 2026-10-28 — Desktop rails actually run; antagonist on routine work
+
+**Symptom.** On a Windows desktop every hook had been failing silently since it was
+installed. `.claude/settings.json` called `python3`, which there is the Microsoft Store
+stub (exit 49), and Claude Code treats any exit other than 0 or 2 as non-blocking.
+`ledger-log` also imported `fcntl`, which does not exist on Windows. `guard-secrets`
+watched Bash only, while the host also offers a PowerShell tool. `bin/litellm` had no
+Windows key store. `bin/install.sh` could not build on Windows (no `zip` in Git Bash).
+Nothing reported any of it.
+
+**Change.**
+- `bin/run-hook` finds a real Python, blocks the call if there is none, and turns a
+  crashing guard's exit into 2.
+- `guard-secrets` covers PowerShell environment and credential-store reads.
+- `ledger-log` locks with `msvcrt` on Windows.
+- `bin/litellm` reads Windows Credential Manager (`ursula-litellm`).
+- `bin/rails-check` feeds each rail a test event and reports what works.
+- `bin/install.sh --target desktop` builds a workspace zip with the rails and
+  operator-facing AGENTS.md/CLAUDE.md, and falls back to Python's zipfile.
+
+The antagonist now runs on every write batch and on check-in drafts before they are
+written (`reference/delegation.md`). If it cannot run, writes proceed on approval and
+the receipt gate, recorded as pending; the operator chose this so claude.ai hosts
+still work. Objected actions are held.
+
+**Observed.** After the change, in T3 with Claude, the live hook denied a Bash command
+naming the key variable. It also denied the maintainer's own commit command, because
+this entry's text named the patterns: a false positive on documentation, so edit docs
+with the file tools. `rails-check` passes on this machine and from an unzipped desktop
+zip. A fake crashing interpreter now blocks (exit 2).
+
+**Review.** Codex was unavailable (spend cap, failed attempt earlier this session), so
+the review ran on LiteLLM `gpt-6-sol`. Six findings:
+1. Hooks do not run under Codex. Accepted; documented per host.
+2. The check-in antagonist ran after writes. Fixed: it now runs on drafts.
+3. `ledger-log` swallows errors. Rebutted: `checkin_verify` fails a run whose claims
+   exceed the ledger.
+4. A crashing guard failed open. Fixed.
+5. Pending review contradicted the check-in completion rule. Resolved per the operator.
+6. A policy command was incomplete. Fixed.
+
+**Not proven.** No check-in or cadence has run the antagonist. Codex hooks are
+absent. The LiteLLM key is not yet stored on this machine. Whether the claude.ai
+sandbox could reach the gateway was not tested.
