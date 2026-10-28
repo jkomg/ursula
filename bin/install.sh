@@ -34,7 +34,7 @@ while [ $# -gt 0 ]; do
 done
 case "$TARGET" in claude|openai|desktop|all) ;; *) echo "invalid target: $TARGET" >&2; exit 2 ;; esac
 # Resolve relative output paths against the caller, before changing into the repo.
-case "$OUT" in /*) ;; *) OUT="$PWD/$OUT" ;; esac
+case "$OUT" in /*|[A-Za-z]:[/\\]*) ;; *) OUT="$PWD/$OUT" ;; esac   # C:/ is absolute too
 
 # What ships. Everything the skill reads at run time, plus the operator's install
 # page. CLAUDE.md, bin/ and dist/ are for maintaining the repo and stay out.
