@@ -459,3 +459,57 @@ of the direct route). Two findings, both accepted:
    live hook was seen denying it.
 2. Stripping NUL and tab before validation stored them instead of refusing. Only
    spaces and line breaks are trimmed now.
+
+## 2026-10-28 — Proving the run: evidence the session did not write
+
+**Why.** The operator caught Claude saying it had checked their email when it had not.
+A second model reading that summary would have believed it too. Only evidence written
+by something other than the session can catch it.
+
+**Change.**
+- The desktop call ledger now records every session, not just check-ins.
+- `scripts/session_verify.py` checks a run's coverage claims against the ledger, cut
+  at a SessionStart marker the harness writes. Reading Gmail means opening messages.
+- An independent recount must cover every count a complete run claims.
+- Desktop sessions publish runs and findings to `ursula-board-feed.json` in Drive. The
+  claude.ai board reads it, labels the desktop's own verdict as self-reported, and
+  can recount Gmail and Calendar for any run window itself, with no model involved.
+
+**Observed.**
+- Before the fix, the desktop ledger had never existed. Git Bash rewrote the default
+  path to `C:/Program Files/Git/var/tmp`, which a normal user cannot write, and the
+  logging hook never blocks, so nothing reported it. `rails-check` now checks the real
+  location is writable.
+- After the fix, a live Slack call in this T3 session was recorded by the hook, and a
+  run claiming a Gmail read was rejected: "run claims Gmail read, but no such call is
+  recorded".
+- Real responses for the board's four new connector calls were observed before
+  publishing: Drive list, Drive read (contents come back already parsed), Gmail list
+  (an empty result has no `messages` key) and Calendar list.
+- The gateway's Drive upload fails ("outside the current directory"). The feed is
+  written with Google's own Drive connector.
+- The live ledger guard denied this maintainer's own edits whenever they named the
+  ledger, including edits to the guard itself; the code now assembles those names.
+
+**Review.** LiteLLM `gpt-6-sol`, two rounds.
+- Round 1 found 8 problems:
+  1. The ledger can still be edited by the agent. Accepted as a limit, guard narrowed,
+     documented.
+  2. The board showed the desktop's verdict as independent. Relabelled self-reported.
+  3. The recount was optional. Fixed.
+  4. The session chose its own cutoff. Fixed with the SessionStart marker.
+  5. Listing Gmail ids counted as reading. Fixed.
+  6. Coverage fields went unchecked. Fixed.
+  7. The check-in promise did not match the code. Docs narrowed.
+  8. Malformed recount pages counted as zero. Fixed.
+- Round 2 found 3 more, all fixed: a missing marker now fails; the verifier exemption is
+  pinned to the repo's own path; a Gmail read with no opens needs a zero recount.
+- A malformed count crashed the verifier until the tests caught it.
+
+**Not proven.**
+- Whether T3 fires SessionStart. `rails-check` warns until a marker appears; without
+  it every run verifies as failed.
+- The board changes have not run in claude.ai and need a full-set capability republish.
+- The recount worker has not run in a real session.
+- The ledger stops a session that claims a read it never made. It does not stop a
+  session set on deceiving: anything running as the operator can rewrite a local file.

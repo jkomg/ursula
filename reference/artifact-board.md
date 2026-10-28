@@ -56,16 +56,48 @@ Three tabs. The selected tab is remembered per browser.
   count or could-not list is marked *not recorded*.
 
 Field shapes for both collections are in `config/schema.md`; change them there first,
-then the page. Findings and Log read the database only — they work when Jira is
-unreachable, which is also when they are most useful.
+then the page. Findings and Log read the database, or the desktop feed when one exists
+(below). Either way they work when Jira is unreachable, which is also when they are
+most useful.
 
 Not built yet: a **Watched boards** tab across every report at once. Hire tabs cover one
 person at a time; the Thursday sweep still produces the all-boards view in chat.
 
+## Desktop feed and the board's own recount
+
+When Ursula runs on a desktop host, the board is a viewer and an auditor. On load it looks
+for `ursula-board-feed.json` in the viewer's Drive (`config/schema.md`, "Board feed").
+If found, the Log, Findings and hire tabs show the feed instead of the database. Findings
+from the feed have no resolve or dismiss buttons, because the desktop store is the master.
+Each run shows its `verified` result: verified, **UNVERIFIED** with the failing claims, not
+verifiable on this host, or none recorded.
+
+For the five latest runs with a window and coverage counts, a **Recount** button has the
+page count Gmail messages and calendar events in that window itself, paging to the end,
+and compare them with what the run claimed. No model is involved, so a session cannot
+talk its way past it. A connector error shows as "could not run", never as a pass. Mail
+deleted since the run lowers today's count and can flag a false "claimed more than
+exist"; read a mismatch as a prompt to look, not a verdict.
+
+Shapes observed in a real session on 2026-10-28, through the Mirantis gateway:
+
+| Tool | Answer |
+|---|---|
+| `google_drive_files_list` | `{files: [{id, name, modifiedTime}]}` |
+| `gws_drive_files_get` with `alt: "media"` | The JSON file's contents, already parsed into an object |
+| `gws_gmail_users_messages_list` | `{messages: [{id, threadId}], nextPageToken, resultSizeEstimate}`. Empty: `{resultSizeEstimate: 0}`, with no `messages` key |
+| `gws_calendar_events_list` | `{items: [...], nextPageToken}` |
+
+The desktop writes the feed with Google's own Drive connector (`create_file`, with
+conversion off). The gateway's `google_drive_files_create` failed on upload on
+2026-10-28: it rejected its own temporary file as "outside the current directory".
+
 ## Publishing this version
 
-`artifact/index.html` is the baseline. **This version adds tools**, for the Outbox tab, so
-the first republish of it must pass the **complete** set, not omit it:
+`artifact/index.html` is the baseline. **This version adds tools**, for the Outbox tab and
+for the feed and recount, so the first republish of it must pass the **complete** set, not
+omit it. Omitting it keeps the stored set, and the feed and recount then fail with "outside
+approved scope". That fails safe, but they don't work.
 
 ```json
 {"db": {}, "user": {},
@@ -73,7 +105,8 @@ the first republish of it must pass the **complete** set, not omit it:
    {"server": "Atlassian", "tools": ["getAccessibleAtlassianResources", "searchJiraIssuesUsingJql",
      "getTransitionsForJiraIssue", "transitionJiraIssue", "addCommentToJiraIssue"]},
    {"server": "Custom Google Drive", "tools": ["google_calendar_events_list", "gws_gmail_send",
-     "gws_calendar_events_insert"]},
+     "gws_calendar_events_insert", "google_drive_files_list", "gws_drive_files_get",
+     "gws_gmail_users_messages_list", "gws_calendar_events_list"]},
    {"server": "Slack", "tools": ["slack_send_message"]}]}}
 ```
 

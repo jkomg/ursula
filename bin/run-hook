@@ -39,7 +39,23 @@ find_python || {
   exit 2
 }
 
+# Record every session, not only check-ins: a planning session once claimed an email
+# read that never happened, and scripts/session_verify.py needs the ledger to catch it.
+# Setting URSULA_LEDGER turns on ledger-log and guard-ledger. The path must be native:
+# Git Bash rewrites /var/tmp/... to C:/Program Files/Git/var/tmp/..., which a normal user
+# cannot write, and ledger-log never blocks, so the ledger silently never existed
+# (observed 2026-10-28). Verifiers get the same path from --ledger-path.
+if [ -z "${URSULA_LEDGER:-}" ]; then
+  if command -v cygpath >/dev/null 2>&1 && [ -n "${LOCALAPPDATA:-}" ]; then
+    URSULA_LEDGER="$(cygpath -w "$LOCALAPPDATA")\\Ursula\\ledger\\ledger.jsonl"
+  else
+    URSULA_LEDGER="/var/tmp/ursula-ledger/ledger.jsonl"
+  fi
+fi
+export URSULA_LEDGER
+
 if [ "${1:-}" = "--which" ]; then echo "${PY[*]}"; exit 0; fi
+if [ "${1:-}" = "--ledger-path" ]; then echo "$URSULA_LEDGER"; exit 0; fi
 # --python ARGS...: run the found interpreter directly (rails-check, install.sh).
 if [ "${1:-}" = "--python" ]; then shift; exec "${PY[@]}" "$@"; fi
 name="${1:?usage: run-hook HOOK_NAME}"

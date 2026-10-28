@@ -194,3 +194,55 @@ Ask for findings as `{action_id, problem, evidence, severity}`, or an empty list
 An antagonist's findings are evidence for the operator, not approval and not a veto
 the model can override. Record each one and what happened to it on the changeset
 action.
+
+## Proving the run
+
+The antagonist judges what a session proposes. It cannot tell whether the session
+did what it says it did. That failure is the reason this file exists: a session told
+the operator it had checked their email, and it had not. A second model reading that
+summary believes it too. Only evidence the session did not write can catch it.
+
+Every session that mined ends with two independent checks before its run record is
+final:
+
+1. **The call ledger.** On a desktop host, `bin/run-hook` records every connector call
+   in a hash-chained ledger the model cannot edit (`bin/guard-ledger`). Run
+   `scripts/session_verify.py RUN.json --ledger "$(bash bin/run-hook --ledger-path)" --since <session start, UTC>`.
+   Any claimed read with no matching call fails, whatever the run's status.
+2. **The recount.** A fresh worker gets only the window and the source list, never the
+   run's claims. It counts what is there: Gmail messages, calendar events and notes
+   documents in the window. It returns `{gmail_in_window, calendar_events,
+   drive_docs_in_window, counted_at, agent, model}`. Pass that file as `--recount`.
+   Use another provider when one is available. Independence comes from re-reading the
+   sources, so a fresh Claude worker is acceptable when the other provider is out.
+
+The cutoff is not the session's to choose. A SessionStart hook writes a `session_start`
+marker into the ledger, and the verifier refuses a `--since` earlier than it, so an
+earlier session's Gmail read cannot back this one's claim. Reading means opening:
+a Gmail claim needs message opens, not just a listing. A complete run needs a recount
+covering every count it claims.
+
+What this proves and what it does not: the ledger catches a session that says it read
+something it never called, which is the failure that happened. It does not stop a
+session set on deceiving: the agent runs as the operator, so it can edit any local
+file, including the ledger, and recompute its unkeyed chain. `bin/guard-ledger` blocks
+the plain routes and leaves a denial in the transcript. The board's own recount does
+not depend on anything the desktop wrote. The `verified` field on the board is the
+desktop's report about itself, and the board labels it that way.
+
+Check-ins keep their existing path: `scripts/checkin_close.py` checks the ledger, and the
+recount for a check-in is the board's. The separate recount worker is for planning,
+retro, ad-hoc and hire-scan sessions.
+
+Store the `--json` result on the run as `verified` (`config/schema.md`). A failed
+verification means the run cannot be `complete`. Its summary and final line say
+**unverified** and name the failing claim. The model does not soften or explain away
+a failure: it reports it and lets the operator decide. Where the ledger cannot exist
+(a claude.ai chat), record `verified: {ok: null, reason: "no ledger on this host"}`
+and say so in the final line. The board's own recount (`reference/artifact-board.md`)
+is the remaining check there.
+
+Then publish the board feed (`config/schema.md`, "Board feed") so the claude.ai board
+shows the run, its findings and its verification. Replace the existing file, whose id is
+in `config/run.board.feed_file_id`, rather than creating another. Write it with Google's
+Drive connector; the gateway's upload is broken (`reference/artifact-board.md`).

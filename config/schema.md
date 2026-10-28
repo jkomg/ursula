@@ -170,7 +170,8 @@ check-in. The board shows the latest 52 sessions and folds check-ins under the d
 | `watermark_before`, `watermark_after` | Timestamps; after remains before on a partial/failed run |
 | `window_start`, `window_end` | Frozen UTC mining bounds; only a successful run advances to window_end |
 | `sources` | `{found, expected, unmatched_meetings: [names]}` — `expected` is the prediction stated before mining |
-| `coverage` | Check-ins only: `{notes_read, slack_dm_read (null if no DM configured), drive_docs_opened, drive_docs_in_window, gmail_listed, gmail_opened, gmail_read, open_set, open_set_evaluated, outbox_stale}`. `scripts/checkin_verify.py` refuses `complete` without them |
+| `coverage` | Every session that mined. Check-ins: `{notes_read, slack_dm_read (null if no DM configured), drive_docs_opened, drive_docs_in_window, gmail_listed, gmail_opened, gmail_read, open_set, open_set_evaluated, outbox_stale}`, refused as `complete` by `scripts/checkin_verify.py` without them. Other sessions add `calendar_read`, `jira_read` and `calendar_events`, and are checked by `scripts/session_verify.py`. Counts are what the session saw in the window, not what it guessed |
+| `verified` | `{ok, errors, ledger_calls, ledger_head, since, recount}` from the verifier. `ok: false` means the run is not `complete`. `ok: null` with `reason` where no ledger can exist |
 | `verified`, `ledger` | `{ok, errors}` and `{calls, errors, head, first, last, by_tool}` from `scripts/checkin_close.py`. A check-in run without `verified.ok` is unverified, and `scripts/audit_trend.py` counts it |
 | `findings_resolved` | Check-ins: open findings closed this run by `session` |
 | `created`, `skipped`, `edited` | Counts from reconcile and write-back |
@@ -184,6 +185,24 @@ The four things every run must end with (`SKILL.md`, "What good looks like") map
 `sources.unmatched_meetings`, `skipped`, the `findings` collection and `could_not`. The
 board marks a run that left any of them out as *not recorded*, so a tidy-looking entry
 with no coverage list reads as incomplete rather than clean.
+
+### Board feed
+
+A desktop host publishes its runs to the claude.ai board through one JSON file in the
+operator's Google Drive, named `ursula-board-feed.json`. It is replaced after each
+session. The board finds it by that name among files the operator owns.
+
+```json
+{"feed_version": 1, "generated_at": "ISO", "organization": "mirantis", "profile": "mirantis",
+ "runs": {"<run id>": {"...": "the runs/<id> document, including coverage and verified"}},
+ "findings": {"<key>": {"...": "the findings/<key> document"}},
+ "hires": {"<slug>": {"...": "the hires/<slug> document"}}}
+```
+
+It carries the shapes above, never config, credentials, receipts' source text or
+another organization's data. The board treats it as untrusted input, the same as an
+export (`scripts/render_snapshot.py`). It is a copy for display: the desktop store
+stays the master, and nothing the board does writes back to it.
 
 ### `state/handoff`
 

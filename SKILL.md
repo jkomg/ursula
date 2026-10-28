@@ -206,7 +206,9 @@ and priorities agreed in the same pass.
 Run the receipt gate in `reference/source-receipts.md` before any external write.
 A failed or unavailable gate blocks write-back and watermark advancement. Then run the
 antagonist pass (`reference/delegation.md`): actions it objects to wait for the operator;
-if it cannot run, write anyway and record it as pending.
+if it cannot run, write anyway and record it as pending. Before the run record is final,
+prove it (`reference/delegation.md`, "Proving the run"): the call ledger and an
+independent recount. A failed check makes the run unverified, and the final line says so.
 
 
 In `dry-run`, emit the changeset and stop: no Jira or Calendar writes and no

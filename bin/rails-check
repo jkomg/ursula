@@ -65,6 +65,32 @@ EOF
 then ok "ledger-log appends a valid hash chain"; else bad "ledger-log did not write a valid chained ledger"; fi
 rm -rf "$tmp"
 
+# 6b. The real ledger location is writable. A throwaway path passing (6) proved nothing
+#     about it: on Windows the old default resolved under Program Files and every session
+#     went unrecorded without an error.
+real="$(bash bin/run-hook --ledger-path)"
+if [ "$have_py" -eq 1 ] && py - "$real" <<'EOF' 2>/dev/null
+import os, sys
+d = os.path.dirname(sys.argv[1]); os.makedirs(d, exist_ok=True)
+sys.exit(0 if os.access(d, os.W_OK) else 1)
+EOF
+then ok "session ledger location is writable: $real"; else bad "session ledger location is not writable: $real (sessions would go unrecorded)"; fi
+
+# 6c. Session starts are recorded by the harness. scripts/session_verify.py fails every
+#     run without a marker, so a host where SessionStart never fires shows up here first.
+grep -q '"SessionStart"' .claude/settings.json && ok "SessionStart hook is wired to ledger-log" \
+  || bad "no SessionStart hook in .claude/settings.json; every session verification will fail"
+if [ "$have_py" -eq 1 ] && py - "$real" <<'EOF' 2>/dev/null
+import json, sys
+try:
+    lines = open(sys.argv[1], 'rb').read().splitlines()
+except OSError:
+    sys.exit(1)
+sys.exit(0 if any(json.loads(l).get('tool') == 'session_start' for l in lines if l.strip()) else 1)
+EOF
+then ok "a session_start marker has been recorded on this machine"
+else warn "no session_start marker recorded yet: start a new session in this folder and rerun. If still none, this host does not fire SessionStart and runs cannot verify"; fi
+
 # 7. The project policy validates and names a reviewer.
 if [ -f ursula-project.json ] && [ "$have_py" -eq 1 ]; then
   route="$(py scripts/project_policy.py ursula-project.json 2>&1)" && ok "project policy valid: $(printf '%s' "$route" | cut -c1-90)" \

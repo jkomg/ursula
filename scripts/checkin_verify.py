@@ -43,8 +43,12 @@ def open_findings(folder):
     return out
 
 
-def ledger_facts(path):
-    """Read the ledger written by bin/ledger-log; return (facts, problems)."""
+def ledger_facts(path, since=None):
+    """Read the ledger written by bin/ledger-log; return (facts, problems).
+
+    The whole chain is verified, but only calls at or after `since` (ISO UTC) count.
+    A desktop ledger persists across sessions; without the cut an earlier session's
+    Gmail read would satisfy this one's claim."""
     probs, calls, prev = [], [], "0" * 64
     for n, raw in enumerate(Path(path).read_bytes().splitlines(), 1):
         try:
@@ -57,6 +61,10 @@ def ledger_facts(path):
             break
         prev = hashlib.sha256(raw).hexdigest()
         calls.append(e)
+    starts = [str(c.get("ts", "")) for c in calls if c.get("tool") == "session_start"]
+    if since:
+        cut = since.replace("+00:00", "Z")[:19]
+        calls = [c for c in calls if str(c.get("ts", ""))[:19] >= cut]
     ok = [c for c in calls if not c.get("error")]
 
     def arg(c, *keys):
@@ -71,12 +79,17 @@ def ledger_facts(path):
             if named(c, "docs_get", "documents_get", "read_file_content", "download_file_content", "files_get",
                      "files_export", "files_download")} - {None}
     facts = {
-        "calls": len(calls), "errors": len(calls) - len(ok), "head": prev,
+        "calls": sum(1 for c in calls if c.get("tool") != "session_start"),
+        "errors": len(calls) - len(ok), "head": prev,
+        "session_start": max(starts) if starts else None,
         "first": calls[0]["ts"] if calls else None, "last": calls[-1]["ts"] if calls else None,
         "docs_opened": docs,
         "gmail_listed": sum(1 for c in ok if "gmail" in c["tool"] and named(c, "messages_list", "threads_list", "triage")),
         "gmail_opened": sum(1 for c in ok if "gmail" in c["tool"] and named(c, "messages_get", "threads_get", "gmail_read")),
         "slack_dm_reads": {arg(c, "channel_id") for c in ok if c["tool"] == "slack_read_channel"} - {None},
+        "calendar_listed": sum(1 for c in ok if "calendar" in c["tool"] and named(c, "events_list", "agenda", "instances")),
+        "jira_searched": sum(1 for c in ok if named(c, "searchJiraIssuesUsingJql", "JiraIssuesUsingJql")),
+        "drive_searched": sum(1 for c in ok if named(c, "files_list", "search_files", "list_recent_files")),
         "notes_read": any(c["tool"] == "ArtifactData" and c["args"].get("collection") == "notes"
                           and c["args"].get("action") in ("get", "list", "query") for c in ok),
         "findings_written": {c["args"].get("doc_id") for c in ok if c["tool"] == "ArtifactData"

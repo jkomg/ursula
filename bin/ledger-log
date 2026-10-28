@@ -76,7 +76,11 @@ def main():
     except ValueError:
         return
     name = ev.get("tool_name", "")
-    if not (name.startswith("mcp__") or name in ("ArtifactData", "Artifact")):
+    if ev.get("hook_event_name") == "SessionStart":
+        # The harness's own record of when this session began. scripts/session_verify.py
+        # refuses a --since earlier than it, so a session cannot borrow an older one's calls.
+        name, ev["tool_input"], ev["tool_response"] = "session_start", {"id": ev.get("source", "")}, ""
+    elif not (name.startswith("mcp__") or name in ("ArtifactData", "Artifact")):
         return
     resp = ev.get("tool_response")
     body = resp if isinstance(resp, str) else json.dumps(resp, sort_keys=True, default=str)

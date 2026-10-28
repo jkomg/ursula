@@ -251,11 +251,13 @@
 </div>
 
 <div class="view" id="v-findings" hidden>
+  <div id="ffeed" class="sync" style="margin-top:14px"></div>
   <div id="fstatus" class="sync" style="margin-top:14px"></div>
   <div id="findings"></div>
 </div>
 
 <div class="view" id="v-log" hidden>
+  <div id="lfeed" class="sync" style="margin-top:14px"></div>
   <div id="lstatus" class="sync" style="margin-top:14px"></div>
   <div id="runs"></div>
 </div>
@@ -270,7 +272,9 @@ const CFG = {
   JQL: 'assignee = currentUser() AND labels = "%LABEL%" ORDER BY duedate ASC, priority DESC',
   JIRA: "Atlassian",                     // connector display name
   GCAL: "Custom Google Drive",           // connector exposing google_calendar_events_list
-  GMAIL: "Custom Google Drive",          // connector exposing gws_gmail_send and gws_calendar_events_insert
+  GMAIL: "Custom Google Drive",          // connector exposing gws_gmail_send, gws_gmail_users_messages_list,
+                                         // gws_calendar_events_insert and gws_calendar_events_list
+  GDRIVE: "Custom Google Drive",         // connector exposing google_drive_files_list and gws_drive_files_get (board feed)
   SLACK: "Slack",                        // connector exposing slack_send_message
   DAY_START: 9, DAY_END: 18,             // working window for gap detection
   MIN_GAP: 45                            // minutes; shorter gaps aren't real work time
@@ -306,6 +310,7 @@ function errText(e){
     not_in_manifest:"call outside approved scope", tool_error:"rejected by the service",
     rate_limited:"rate limited", cancelled:"cancelled",
     service_said:"Jira reported a problem",
+    google_said:"Google reported a problem", too_many_pages:"too many pages to count",
     bad_shape:"response came back in a shape I couldn't read"};
   const base = (e && m[e.code]) || (e && e.code) || "unknown error";
   return e && e.detail ? base + " — " + e.detail : base;
@@ -806,7 +811,8 @@ function findingCard(f){
 
   // The operator's verdict goes back to the database; the next session reads it
   // and stops re-raising the finding. The session, not the page, changes Jira.
-  if(db && canWrite !== false){
+  // A finding from the desktop feed has no document here to update: no buttons.
+  if(db && canWrite !== false && !f._feed){
     const acts = el("div","acts");
     const sync = el("span","sync");
     const form = el("div"); form.style.cssText = "display:none;width:100%";
@@ -856,13 +862,116 @@ function findingCard(f){
   return c;
 }
 
+/* The run's own verification (reference/delegation.md, "Proving the run"). */
+function verifiedEl(r){
+  const v = r.verified;
+  const box = el("div","sync");
+  if(!v || typeof v !== "object" || !("ok" in v)){ box.textContent = "No verification recorded"; return box; }
+  if(v.ok === true){
+    const n = v.ledger_calls !== undefined ? v.ledger_calls : (r.ledger && r.ledger.calls);
+    box.className = "sync ok";
+    // The desktop session publishes this verdict about itself; only the Recount below is independent of it.
+    box.textContent = "Desktop reports verified (ledger " + (n === undefined || n === null ? "?" : str(n)) +
+      " calls). Self-reported by the session; use Recount for an independent check.";
+  } else if(v.ok === false){
+    box.className = "sync bad";
+    box.appendChild(el("b","","UNVERIFIED (reported by the desktop's own verifier)"));
+    const errs = arr(v.errors).map(x => typeof x === "string" ? x : JSON.stringify(x)).filter(Boolean);
+    if(errs.length){ const ul = el("ul"); for(const x of errs) ul.appendChild(el("li","",x)); box.appendChild(ul); }
+  } else if(v.ok === null){
+    box.textContent = "Not verifiable on this host: " + (str(v.reason) || "no reason given");
+  } else box.textContent = "No verification recorded";
+  return box;
+}
+
+/* ---------- board recount ----------
+   An audit no model takes part in: the page counts Gmail messages and calendar
+   events in a run's frozen window with the viewer's own connector and sets them
+   beside what the run said it saw. On a button, not on load, to keep connector
+   calls down. Results live in memory only, like liveCache. */
+const audits = {};               // run id -> {pending} | {err} | {gmail, cal, at}
+const RECOUNT_MAX_PAGES = 40;
+let lastRuns = [];
+const num = v => typeof v === "number" && isFinite(v);
+function auditable(r){
+  const c = r.coverage;
+  return !!(r._id && c && typeof c === "object" &&
+    !isNaN(Date.parse(str(r.window_start))) && !isNaN(Date.parse(str(r.window_end))) &&
+    (num(c.gmail_listed) || num(c.calendar_events)));
+}
+/* Google's own errors come back as {error:{code,message}}; never read them as zero. */
+function googleErr(p){
+  if(p && typeof p === "object" && !Array.isArray(p) && p.error){
+    const e = p.error;
+    throw {code:"google_said", detail: (typeof e === "string" ? e : str(e.message || e.status || JSON.stringify(e))).slice(0,300)};
+  }
+}
+async function countAll(server, tool, params, key, valid){
+  let n = 0, token = null;
+  for(let i = 0; i < RECOUNT_MAX_PAGES; i++){
+    const p = unwrap(await call(server, tool, {params: Object.assign({}, params, token ? {pageToken: token} : {})}));
+    googleErr(p);
+    if(!p || typeof p !== "object" || !valid(p)) throw {code:"bad_shape", detail: tool + " answered without a " + key + " list"};
+    n += arr(p[key]).length;
+    if(!p.nextPageToken) return n;
+    if(p.nextPageToken === token) throw {code:"bad_shape", detail: tool + " returned the same page token twice"};
+    token = p.nextPageToken;
+  }
+  throw {code:"too_many_pages", detail: "stopped after " + RECOUNT_MAX_PAGES + " pages of " + tool};
+}
+async function recount(r){
+  const id = r._id, c = r.coverage;
+  audits[id] = {pending: true}; renderRuns(lastRuns);
+  const a = new Date(r.window_start), b = new Date(r.window_end);
+  try{
+    if(!mcp) throw {code:"server_not_connected"};
+    const out = {at: new Date()};
+    if(num(c.gmail_listed))
+      out.gmail = await countAll(CFG.GMAIL, "gws_gmail_users_messages_list",
+        {userId: "me", maxResults: 500, q: "after:" + Math.floor(a / 1000) + " before:" + Math.floor(b / 1000)},
+        "messages", p => Array.isArray(p.messages) || (p.resultSizeEstimate === 0 && !p.nextPageToken));
+    if(num(c.calendar_events))
+      out.cal = await countAll(CFG.GCAL, "gws_calendar_events_list",
+        {calendarId: "primary", singleEvents: true, maxResults: 2500, timeMin: a.toISOString(), timeMax: b.toISOString()},
+        "items", p => Array.isArray(p.items));
+    audits[id] = out;
+  }catch(e){ audits[id] = {err: errText(e)}; }
+  renderRuns(lastRuns);
+}
+function auditEl(r){
+  const box = el("div","row");
+  const res = audits[r._id];
+  const st = str(r.status) || "complete";
+  const b = el("button","move", res && !res.pending ? "Recount again" : "Recount");
+  b.disabled = !mcp || !!(res && res.pending);
+  b.addEventListener("click", () => recount(r));
+  box.appendChild(b);
+  if(!mcp){ box.appendChild(el("span","sync","recount needs the Google connector")); return box; }
+  if(!res) return box;
+  if(res.pending){ box.appendChild(el("span","sync","Counting Gmail and Calendar…")); return box; }
+  if(res.err){ box.appendChild(el("span","sync bad","Recount could not run: " + res.err)); return box; }
+  const cmp = (label, x, y) => {
+    if(x === undefined) return;
+    const over = y > x, under = st === "complete" && y < x;
+    box.appendChild(el("span", "sync " + (over || under ? "bad" : "ok"),
+      label + ": board counted " + x + ", run said " + y +
+      (over ? " · MISMATCH: the run claimed more than exist" : under ? " · MISMATCH: a complete run saw fewer than exist" : "")));
+  };
+  cmp("Gmail", res.gmail, r.coverage.gmail_listed);
+  cmp("Calendar", res.cal, r.coverage.calendar_events);
+  box.appendChild(el("span","sync","counted " + hhmm(res.at) + ", as the sources stand now"));
+  return box;
+}
+
 function renderRuns(runs){
+  lastRuns = runs;
   const host = $("runs"); host.innerHTML = "";
   $("lcount").textContent = runs.length ? String(runs.length) : "";
   if(!runs.length){
     host.appendChild(el("div","empty","No sessions logged yet. Each planning and retro session adds one entry here."));
     return;
   }
+  const toAudit = new Set(runs.filter(auditable).slice(0, 5).map(r => r._id));
   for(const r of runs){
     const st = str(r.status) || "complete";
     if(r.session === "checkin"){
@@ -871,6 +980,8 @@ function renderRuns(runs){
       const cn = arr(r.could_not).map(str).filter(Boolean);
       c.appendChild(el("span","", str(r.date).slice(0,10) + " · check-in " + str(r.time || "") +
         " · " + (str(r.summary) || st) + (cn.length ? " · could not: " + cn.join("; ") : "")));
+      c.appendChild(verifiedEl(r));
+      if(toAudit.has(r._id)) c.appendChild(auditEl(r));
       host.appendChild(c);
       continue;
     }
@@ -914,6 +1025,8 @@ function renderRuns(runs){
     if(r.skipped === undefined) missing.push("skip count");
     if(!Array.isArray(r.could_not)) missing.push("could-not list");
     if(missing.length) c.appendChild(el("div","sync bad","Not recorded: " + missing.join(", ")));
+    c.appendChild(verifiedEl(r));
+    if(toAudit.has(r._id)) c.appendChild(auditEl(r));
     host.appendChild(c);
   }
 }
@@ -925,17 +1038,88 @@ function watchRecords(){
     renderFindings(); renderRuns([]);
     return;
   }
+  // While a desktop feed is showing, the database is kept but not displayed.
   db.collection("findings").onSnapshot(snap => {
-    findings = snap.docs.map(d => Object.assign({_id: d.id}, d.data() || {}));
+    dbFindings = snap.docs.map(d => Object.assign({_id: d.id}, d.data() || {}));
+    if(feed) return;
+    findings = dbFindings;
     $("fstatus").textContent = snap.metadata.fromCache ? "Refreshing…" : "";
     renderFindings();
     renderHireTabs();
     if(/^hire:/.test(currentTab)) renderHire(currentTab.slice(5));
-  }, e => { $("fstatus").className = "sync bad"; $("fstatus").textContent = dbErr(e); });
+  }, e => { if(feed) return; $("fstatus").className = "sync bad"; $("fstatus").textContent = dbErr(e); });
   db.collection("runs").orderBy("date","desc").limit(150).onSnapshot(snap => {
+    dbRuns = snap.docs.map(d => Object.assign({_id: d.id}, d.data() || {}));
+    if(feed) return;
     $("lstatus").textContent = snap.metadata.fromCache ? "Refreshing…" : "";
-    renderRuns(snap.docs.map(d => d.data() || {}));
-  }, e => { $("lstatus").className = "sync bad"; $("lstatus").textContent = dbErr(e); });
+    renderRuns(dbRuns);
+  }, e => { if(feed) return; $("lstatus").className = "sync bad"; $("lstatus").textContent = dbErr(e); });
+}
+
+/* ---------- desktop feed ----------
+   A desktop host publishes its runs, findings and hires to one Drive file the
+   operator owns (config/schema.md, "Board feed"). When it exists the board shows
+   it in place of the database. It is untrusted input: parsed as JSON only,
+   shape-checked, rendered with textContent, and nothing here writes back to it. */
+const FEED_NAME = "ursula-board-feed.json";
+let feed = null, dbFindings = [], dbRuns = [], dbHires = [];
+function docsOf(map){
+  const out = [];
+  if(!map || typeof map !== "object" || Array.isArray(map)) return out;
+  for(const k of Object.keys(map)){
+    const v = map[k];
+    if(k === "__proto__" || !v || typeof v !== "object" || Array.isArray(v)) continue;
+    const d = {_id: k, _feed: true};
+    for(const f of Object.keys(v)) if(f !== "__proto__" && f !== "_id" && f !== "_feed") d[f] = v[f];
+    out.push(d);
+  }
+  return out;
+}
+/* The file body may arrive parsed, as a JSON string, or inside a gateway wrapper. */
+function feedFrom(p){
+  for(const c of [p, p && p.body, p && p.data, p && p.stdout, p && p.result]){
+    const x = typeof c === "string" ? unwrap(c) : c;
+    if(x && typeof x === "object" && !Array.isArray(x) && "feed_version" in x) return x;
+  }
+  return null;
+}
+async function loadFeed(){
+  const note = $("lfeed");
+  note.className = "sync"; note.textContent = "Looking for a desktop feed in your Drive…";
+  try{
+    const p = unwrap(await call(CFG.GDRIVE, "google_drive_files_list", {
+      q: "name = '" + FEED_NAME + "' and 'me' in owners and trashed = false",
+      orderBy: "modifiedTime desc", pageSize: 5, fields: "files(id,name,modifiedTime)"}));
+    googleErr(p);
+    const files = listOf(p && p.files) || listOf(p);
+    if(!files) throw {code:"bad_shape", detail:"the Drive listing had no files list"};
+    const hit = files.find(f => f && f.name === FEED_NAME && f.id);
+    if(!hit){ note.textContent = "No desktop feed in your Drive; showing what was recorded in this board's database."; return; }
+    const raw = await call(CFG.GDRIVE, "gws_drive_files_get", {params: {fileId: str(hit.id), alt: "media"}});
+    const f = feedFrom(unwrap(raw)) || feedFrom(raw);
+    if(!f){ googleErr(unwrap(raw)); throw {code:"bad_shape", detail:"the feed file is not the expected JSON"}; }
+    if(f.feed_version !== 1) throw {code:"bad_shape", detail:"feed_version " + str(f.feed_version) + "; this board reads 1"};
+    useFeed(f);
+  }catch(e){
+    note.className = "sync bad";
+    note.textContent = "Desktop feed could not be read: " + errText(e) + ". Showing this board's database instead.";
+  }
+}
+function useFeed(f){
+  feed = {
+    generated_at: str(f.generated_at),
+    runs: docsOf(f.runs).sort((a,b) => str(b.date).localeCompare(str(a.date)) || b._id.localeCompare(a._id)).slice(0, 150),
+    findings: docsOf(f.findings),
+    hires: docsOf(f.hires).sort((a,b) => str(a.name).localeCompare(str(b.name)))
+  };
+  const n = $("lfeed"); n.className = "sync ok";
+  n.textContent = "Feed from desktop, generated " + (feed.generated_at || "at an unknown time") +
+    ". The desktop store is the master; nothing here writes back to it.";
+  $("ffeed").textContent = "From the desktop feed. Resolve or dismiss these in a desktop session; this board cannot write to that store.";
+  $("fstatus").textContent = $("lstatus").textContent = "";
+  findings = feed.findings; hires = feed.hires;
+  renderFindings(); renderRuns(feed.runs); renderHireTabs();
+  if(/^hire:/.test(currentTab)) renderHire(currentTab.slice(5));
 }
 
 /* ---------- hire tabs ----------
@@ -1100,7 +1284,9 @@ async function renderLive(h, host){
 function watchHires(){
   if(!db) return;
   db.collection("hires").orderBy("name").onSnapshot(snap => {
-    hires = snap.docs.map(d => Object.assign({_id: d.id}, d.data() || {}));
+    dbHires = snap.docs.map(d => Object.assign({_id: d.id}, d.data() || {}));
+    if(feed) return;
+    hires = dbHires;
     renderHireTabs();
     if(/^hire:/.test(currentTab)) renderHire(currentTab.slice(5));
   }, () => {});
@@ -1375,6 +1561,9 @@ async function saveDrafts(){
 
   mcp = await claude.use("mcp");
   renderOutbox();
+  if(lastRuns.length) renderRuns(lastRuns);   // the recount buttons depend on mcp
+  if(mcp) loadFeed();                    // not awaited: Jira does not wait on Drive
+  else { $("lfeed").textContent = "No connector access, so no desktop feed; showing this board's database."; }
   if(mcp && /^hire:/.test(currentTab)) renderHire(currentTab.slice(5));
   if(!mcp){ setStatus("No connector access — this page can't reach Jira or Calendar from here.", true); return; }
 
