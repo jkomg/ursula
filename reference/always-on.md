@@ -22,7 +22,8 @@ Monday and Thursday, where the operator is present to decide.
 3. **Read `state/checkin`.** It holds this routine's own watermark and the last Slack
    message it read. It is separate from `state/watermark`, which only the Monday and
    Thursday sessions advance.
-4. **Freeze the window**: from `state/checkin.watermark` to now.
+4. **Freeze the window**: from `state/checkin.watermark` to now. Copy
+   `state/checkin.pending_sources` into the run's `pending_in`; those are read first.
 5. **Check the routine itself ran.** The check-ins are scheduled
    (`config/checkins.schedule`). List the last day's `runs` with `session: checkin`; if a
    scheduled slot has no record (the routine did not fire, or died before writing), say
@@ -67,22 +68,67 @@ operator's Slack DM (pass 1) is the third: it is read every run when
 `config/checkins.slack_dm` is set, and a run that did not use the Slack connector says
 so as a skipped source. The other two:
 
-1. **Drive notes.** List every notes document modified in the window (Gemini notes,
-   `Notes - <meeting>` documents), open each one, take its action items and reconcile
-   them against Jira. A title seen in a listing is not a read. An empty template is read
-   and reported as empty.
-2. **Gmail.** Read the window's mail, not just the newest page: page through
-   `messages_list` until the window is covered, read the headers of everything that is
-   not an automated notification, and open anything from a person. A list of message
-   ids is not a read (a run that listed 25 of about 200 ids and triaged none recorded
-   itself as having checked mail). If a helper caps the count, page again for the
-   rest. If one Gmail tool
-   fails (a 502 from `google_gmail_messages_list`, say), try the other
-   (`gws_gmail_users_messages_list`) before giving up.
+1. **Drive notes.** Take the window's notes documents from two places and merge them by
+   file id: the attachments on calendar events that **ended** in the window, and a Drive
+   search on `createdTime` (never `modifiedTime`; see `reference/mining.md`) that starts
+   **24 hours before** `state/checkin.watermark`. Drop any id already in
+   `state/checkin.read_sources`; what is left is `drive_docs_in_window`. The lookback
+   exists because a notes document is created when the meeting starts but reaches the
+   operator only when it is shared afterwards, often after the check-in that covered
+   the meeting has closed its window. Without the lookback that document is never
+   in any window. Open each one, take its action items and reconcile them against
+   Jira. A title seen in a listing is not a read. An empty template is read and
+   reported as empty.
+
+   **Long notes do not fit in one tool reply.** A Gemini document for an hour-long
+   meeting, with its transcript tab, runs past 90,000 characters and
+   `read_file_content` fails with a size error (five check-ins, 28 Oct to 2 Nov). Do
+   not fall back to reading the harness's saved output and recording it as unread.
+   Read it in a form that fits: export it as plain text (`gws_drive_files_export`,
+   `mimeType: text/plain`), or read it tab by tab with `gws_docs_documents_get`
+   (`includeTabsContent: true`). The **Notes** tab carries the summary and next
+   steps; read the transcript tab only when the notes tab says no summary was
+   produced (2 Nov: a run read the notes tab, found "no summary", and never opened the
+   transcript). An oversize read that did return the content is counted as opened by
+   the ledger; one that returned only an error is not.
+2. **Gmail.** Keep automated mail out of the query instead of trying to triage it, so
+   the messages that remain are few enough to open every one. Search with
+   `after:<window start as epoch seconds> before:<window end as epoch seconds>` (not
+   `newer_than`, which has day granularity, and not a date, which Gmail does not read
+   as UTC) and add `-from:` for each sender in `config/checkins.gmail_exclude`,
+   plus `-category:promotions -category:social`. Page with `nextPageToken` until the
+   window is covered. Then **open every message the query returned**, at least with
+   `format: metadata`, and read in full anything from a person addressed to the
+   operator. `gmail_listed` is the count the query returned and `gmail_opened` the
+   count opened; a complete run has the two equal. A list of ids is not a read, and
+   neither is a sample: runs on 3 Nov listed about 60 messages, opened 8 to 10 "to save
+   budget", and were still recorded as having read mail. If the exclusion list leaves
+   more than 40 messages, it is missing a noisy sender: open them all anyway this run,
+   and propose the sender for the list in the final line.
+
+   If `google_gmail_messages_list` answers 502 once, switch to
+   `gws_gmail_users_messages_list` for the rest of the run rather than retrying (four
+   runs saw the 502; on 16 Oct the other tool also ignored its `after:` filter and
+   returned the same 24 messages for every window, so check that the dates returned
+   fall inside the window).
 
 The first defect: a check-in listed two new notes by title, skipped Gmail, recorded
 `complete` and advanced the watermark, so the next window would never have contained
 them. The one-line summary said "nothing needs you".
+
+**Carry what could not be read; do not hold the whole window.** A run that read
+everything except one document or a handful of messages names each one, by id, in
+`carried_sources` (`{kind: "drive"|"gmail", id, title, reason, carry_count}`). The
+run is still `partial` and says so in the final line, but the watermark may advance,
+and the carried items become `state/checkin.pending_sources`, which the next check-in
+reads **first**, before anything new. Without this, one unreadable document kept the
+watermark at 2 Nov 12:14Z for six runs; each window grew, and each run had more to
+read and was more likely to fall short. The verifier allows the move only when every
+gap is accounted for: the Drive gap equals the carried documents, the Gmail gap equals
+the carried messages, the notes and DM passes ran, and no connector failed outright (a
+403, a 502 with no working fallback, a timeout). A source that has been carried three
+times is not carried a fourth: raise it as a finding, `unreadable-source-<id>`, so
+the operator hears about it.
 
 ### 3. The quick checks
 
@@ -198,7 +244,8 @@ connector write, which is the right default.
 - `runs/<date>-checkin-<HHMM>` with `session: checkin` and the usual fields; `created`
   and `edited` are 0 because a check-in writes to Jira only through the outbox
 - `coverage`: `{notes_read, slack_dm_read, drive_docs_opened, drive_docs_in_window,
-  gmail_listed, gmail_read, open_set, open_set_evaluated, outbox_stale}`, the counts
+  gmail_listed, gmail_opened, gmail_read, open_set, open_set_evaluated, outbox_stale}`,
+  the counts
   and booleans behind the rules above, so that completeness can be checked rather than
   claimed. `scripts/checkin_verify.py` reads this and the findings and refuses a record
   that says `complete` without them; run it on the record before writing it (see
@@ -207,14 +254,23 @@ connector write, which is the right default.
   `coverage.outbox_stale` and name them in the summary. The board will not send them;
   only the operator can re-approve or reject, so a stale item is a thing the operator
   needs to hear about once, not an item to leave untouched and unmentioned
-- `status`: `complete` only if the coverage rule above was met (Drive notes opened,
-  Gmail windowed and read) and no required connector failed. Otherwise `partial`, with
+- `status`: `complete` only if the coverage rule above was met (every Drive notes
+  document opened, every Gmail message the query returned opened) and no required
+  connector failed. Otherwise `partial`, with
   each unread source named in `could_not`. Never write `complete` on a run whose
   `could_not` lists a skipped required source
-- `state/checkin`: `watermark` to the frozen window end and `slack_last_ts` to the
-  newest operator message read, **only if `status` is `complete`**. A `partial` run
-  leaves both where they were, so the next check-in re-reads the same window;
-  reconciliation skips what already exists
+- `state/checkin`: `watermark`, `slack_last_ts` and `pending_sources` **only as
+  `checkin_close.py` prints them** (`pending_sources` is this run's `carried_sources`).
+  Separately, on every run, partial or not, add the ids of documents and messages
+  opened this run to `read_sources` (`{id: opened_at}`, dropping entries older than 14
+  days), which is what keeps the 24-hour lookback from reading a document twice. The
+  script prints a new state for a `complete`
+  run, and for a `partial` run whose every gap is carried (see "Carry what could not
+  be read"). Any other `partial` run leaves `state/checkin` where it was, so the next
+  check-in re-reads the same window; reconciliation skips what already exists
+- `pending_in`: the `state/checkin.pending_sources` this run started with. Each one is
+  either opened this run or carried again with `carry_count` one higher; the verifier
+  refuses a run that drops one silently
 - `could_not`: every connector that failed, every source it could not open. A check-in
   that quietly skipped Jira looks exactly like one that found nothing
 - A connector that failed for a reason only the operator can fix belongs in the final
@@ -238,7 +294,8 @@ call to a hash-chained ledger with the harness's clock (`docs/governance.md`).
    summary.
 3. Write `status` as `status_allowed`, store `verified: {ok, errors}` and the `ledger`
    summary (including `head`) on the run record, and move `state/checkin` **only to the
-   `state_checkin` it printed**, which exists only when verification passed.
+   `state_checkin` it printed**, which exists only when verification passed and the run
+   was complete or carried every gap.
 4. The final message is `final_line`, verbatim. Do not rewrite it, shorten it or
    substitute "Nothing needs you." The script has already put `partial` first, then
    imminent findings, then outbox items.

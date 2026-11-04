@@ -90,9 +90,12 @@ overwriting a note or setting the operator changed meanwhile; the final-line rul
 what the phone shows, so a longer message is noise.
 
 The setup interview does not create `config/checkins` (`enabled`, `schedule`,
-`slack_dm`) or `config/voice` (`level`, default `quiet`). Create them on the board's
-Outbox tab or by asking Claude before the first run; without `config/voice` the check-in
-has no level to choose its final line by.
+`slack_dm`, `gmail_exclude`) or `config/voice` (`level`, default `quiet`). Create them
+on the board's Outbox tab or by asking Claude before the first run; without
+`config/voice` the check-in has no level to choose its final line by, and without
+`gmail_exclude` it has too much automated mail to open every message, so every run is
+`partial`. Seed `gmail_exclude` by listing the senders of the last week's mail and
+asking the operator which are automated.
 
 ## LiteLLM (later)
 

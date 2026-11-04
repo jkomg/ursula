@@ -8,10 +8,10 @@ Prints one JSON object:
 
   verified        true only if scripts/checkin_verify.py passes, ledger included
   errors          what failed
-  status_allowed  "complete" if verified, otherwise "partial"
+  status_allowed  "complete" only for a verified complete run, otherwise "partial"
   final_line      the one line for the operator, built from the record, the open findings
                   and the ledger, never from the model's recollection
-  state_checkin   {watermark, slack_last_ts} to write, present only when verified
+  state_checkin   {watermark, slack_last_ts, pending_sources}, when safe to advance
   ledger          {calls, errors, head, first, last, by_tool} for the run record
 
 The model writes the run record and decides what the findings say; this decides whether
@@ -86,6 +86,8 @@ def main(argv):
     if not verified:
         gaps = [e.split(":", 1)[-1].strip()[:70] for e in errs[:3]]
         parts.append("partial, " + "; ".join(gaps) + (f" (+{len(errs) - 3} more)" if len(errs) > 3 else "") + ", will retry")
+    elif run.get("status") == "partial":
+        parts.append("partial, will retry")
     parts += [f"{f['title'][:60]} (due {f['due_at'][:16].replace('T', ' ')})" for f in imminent[:3]]
     if len(imminent) > 3:
         parts.append(f"{len(imminent) - 3} more due soon")
@@ -102,10 +104,13 @@ def main(argv):
 
     out = {
         "verified": verified, "errors": errs,
-        "status_allowed": "complete" if verified else "partial",
+        "status_allowed": "complete" if verified and run.get("status") == "complete" else "partial",
         "final_line": line,
-        "state_checkin": ({"watermark": run["window_end"], "slack_last_ts": run.get("slack_last_ts")}
-                          if verified and run.get("status") == "complete" else None),
+        "carried": len(run.get("carried_sources") or []),
+        "state_checkin": ({"watermark": run["window_end"], "slack_last_ts": run.get("slack_last_ts"),
+                           "pending_sources": run.get("carried_sources", [])}
+                          if verified and (run.get("status") == "complete" or
+                                           run.get("status") == "partial" and not V.carry_ok(run)) else None),
         "ledger": {k: facts[k] for k in ("calls", "errors", "head", "first", "last", "by_tool")},
     }
     print(json.dumps(out, indent=2))

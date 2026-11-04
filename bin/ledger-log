@@ -107,6 +107,8 @@ def main():
             "sha256": hashlib.sha256(body.encode("utf-8", "replace")).hexdigest(),
             "prev": prev,
         }
+        if err and len(body) >= 50000:
+            entry["oversize"] = True
         fh.write((json.dumps(entry, sort_keys=True) + "\n").encode())
         fh.flush()
 

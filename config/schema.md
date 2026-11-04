@@ -86,6 +86,7 @@ only sets the starting value. It is the one config document the board may change
 | `routine` | The routine's claude.ai link, so the operator can find it to pause it |
 | `schedule` | Human-readable, e.g. "weekdays 8am, noon, 4pm ET" |
 | `slack_dm` | The channel id of the operator's DM with themselves (a `D…` id) |
+| `gmail_exclude` | Sender addresses or domains left out of the check-in Gmail query (`-from:` each), e.g. `jira@<site>.atlassian.net`, `calendar-notification@google.com`, `drive-shares-dm-noreply@google.com`. Seeded at setup from last week's mail; never includes `gemini-notes@google.com`. Without it a check-in cannot open every message and stays `partial` |
 
 ## State
 
@@ -96,7 +97,7 @@ Operational, not configuration. Same database, `state` collection.
 | `state/watermark` | Timestamp of last successful mine. Only updated on success. |
 | `state/ingested` | Source document id to created issue keys. Prevents re-ingestion. |
 | `state/tagging` | Proposals and whether the operator accepted them. |
-| `state/checkin` | `watermark` (the check-ins' own, never the cadence's) and `slack_last_ts` (newest operator DM message read). Advanced only by a completed check-in. |
+| `state/checkin` | `watermark` (the check-ins' own, never the cadence's), `slack_last_ts` (newest operator DM message read), `pending_sources` (sources a previous run could not read, `[{kind, id, title, reason, carry_count}]`, read first next time) and `read_sources` (`{id: opened_at}` for 14 days, so the Drive lookback does not re-read). The first three move only to the `state_checkin` that `scripts/checkin_close.py` prints: on a complete run, or a partial run that carried every gap. `read_sources` is added to on every run. |
 
 ### `notes/<id>`
 
@@ -165,7 +166,9 @@ check-in. The board shows the latest 52 sessions and folds check-ins under the d
 | `session` | `plan` · `retro` · `adhoc` · `hire-scan` · `checkin` |
 | `time` | Check-ins only: local `HH:MM` the check-in ran, read from the clock |
 | `mode` | `dry-run` · `sandbox` · `live` |
-| `status` | `complete` · `partial` · `failed`. Only `complete` advances the watermark |
+| `status` | `complete` · `partial` · `failed`. Only `complete` advances the cadence watermark. A check-in that is `partial` may advance its own watermark when every unread source is in `carried_sources` |
+| `carried_sources`, `pending_in` | Check-ins: sources not read this run, and the pending sources it started with, each `{kind: "drive"\|"gmail", id, title, reason, carry_count}`. Checked by `scripts/checkin_verify.py` |
+| `opened_ids` | Check-ins: ids of documents and messages opened this run. Used by `scripts/checkin_verify.py` only when it runs without `--ledger`, which proves nothing; `checkin_close.py` always passes the ledger, and there a pending source counts as opened only if the ledger shows the read |
 | `summary` | One or two sentences |
 | `watermark_before`, `watermark_after` | Timestamps; after remains before on a partial/failed run |
 | `window_start`, `window_end` | Frozen UTC mining bounds; only a successful run advances to window_end |

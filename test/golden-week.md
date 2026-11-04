@@ -513,3 +513,31 @@ by something other than the session can catch it.
 - The recount worker has not run in a real session.
 - The ledger stops a session that claims a read it never made. It does not stop a
   session set on deceiving: anything running as the operator can rewrite a local file.
+
+## 2026-11-04 — check-ins that never finish reading (live board, from the run log)
+
+Found by the operator noticing that notes and mail were sometimes not read. All 74
+check-in records (30 Sep to 3 Nov) were read; every run since 2 Nov 12:14Z was
+`partial` and the watermark had not moved for six runs.
+
+| # | Symptom | Fix |
+|---|---|---|
+| 14 | Long Gemini notes (an hour's meeting with transcript) exceed the tool reply limit; `read_file_content` errors, the run reads the saved overflow file, and the ledger counts no open. Five runs, 28 Oct to 2 Nov. | Read by plain-text export or tab by tab; `bin/ledger-log` marks an errored call with a body of 50,000 bytes or more as `oversize`, and the verifier counts it as opened because the content came back. |
+| 15 | Gmail listed about 60 per run and opened 8 to 10 "to save budget"; on 3 Nov 20:11 the close-out script allowed `complete` and the model recorded `partial` by hand. | Exclude automated senders in the query (`config/checkins.gmail_exclude`) and open every result; the verifier refuses `complete` when `gmail_opened < gmail_listed`. |
+| 16 | One unreadable source held the whole window: six partial runs on one watermark, each window larger than the last. | `carried_sources`: a partial run that names every gap by id may advance; carried items become `pending_sources`, read first next time, and become a finding after three carries. |
+| 17 | `always-on.md` said to list notes "modified in the window", contradicting `mining.md` (`createdTime`); 1 Oct re-listed 29 Sep notes. A document created at meeting start and shared at the end can fall between windows. | `createdTime` with a 24-hour lookback, de-duplicated against `state/checkin.read_sources`, plus attachments on events that ended in the window. |
+| 18 | `docs_get` returned only the Notes tab; a 2 Nov run reported "no summary produced" and never opened the transcript. | Read the transcript tab when the Notes tab has no summary. |
+
+Not yet proven in claude.ai: that `gws_drive_files_export` with `text/plain` fits in one
+reply for the longest documents; that the PostToolUse body of an oversize read is the
+content rather than a short error; that `after:`/`before:` with epoch seconds is honoured
+by both Gmail tools. First thing to read after the next check-in: `coverage`,
+`carried_sources` and whether `state/checkin.watermark` moved.
+
+Review, 2026-11-04: Mirantis LiteLLM (default reviewer model), one round on the frozen diff.
+Two "high" findings rejected after checking the code: the `state_checkin` condition is not
+inverted (`not carry_ok(run)` is true only for an empty error list), and partial runs do
+get the ledger-backed claim checks (`status in ("complete", "partial")`). One accepted:
+`opened_ids` was undocumented; it is now in `config/schema.md`, and only matters without
+`--ledger`. Local checks re-run by the lead: all six test files pass (17 new tests),
+`bin/install.sh --check` passes.

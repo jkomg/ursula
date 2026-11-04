@@ -75,7 +75,8 @@ def ledger_facts(path, since=None):
 
     def named(c, *needles):
         return any(x in c["tool"] for x in needles)
-    docs = {arg(c, "documentId", "fileId", "file_id") for c in ok
+    docs = {arg(c, "documentId", "fileId", "file_id") for c in calls
+            if (not c.get("error") or c.get("oversize"))
             if named(c, "docs_get", "documents_get", "read_file_content", "download_file_content", "files_get",
                      "files_export", "files_download")} - {None}
     facts = {
@@ -84,6 +85,8 @@ def ledger_facts(path, since=None):
         "session_start": max(starts) if starts else None,
         "first": calls[0]["ts"] if calls else None, "last": calls[-1]["ts"] if calls else None,
         "docs_opened": docs,
+        "gmail_ids_opened": {arg(c, "id", "messageId") for c in ok
+                             if "gmail" in c["tool"] and named(c, "messages_get", "threads_get", "gmail_read")} - {None},
         "gmail_listed": sum(1 for c in ok if "gmail" in c["tool"] and named(c, "messages_list", "threads_list", "triage")),
         "gmail_opened": sum(1 for c in ok if "gmail" in c["tool"] and named(c, "messages_get", "threads_get", "gmail_read")),
         "slack_dm_reads": {arg(c, "channel_id") for c in ok if c["tool"] == "slack_read_channel"} - {None},
@@ -100,6 +103,47 @@ def ledger_facts(path, since=None):
     for c in calls:
         facts["by_tool"][c["tool"]] = facts["by_tool"].get(c["tool"], 0) + 1
     return facts, probs
+
+
+def carry_ok(run) -> list[str]:
+    """Return the broken rules that prevent a partial run advancing its watermark."""
+    errs = []
+    cov = run.get("coverage") or {}
+    if not isinstance(cov, dict):
+        return ["coverage must be an object"]
+    carried = run.get("carried_sources") or []
+    if not isinstance(carried, list):
+        return ["carried_sources must be a list"]
+    if cov.get("notes_read") is not True:
+        errs.append("coverage.notes_read is not true")
+    if cov.get("slack_dm_read") not in (True, None):
+        errs.append("coverage.slack_dm_read is false")
+    seen = set()
+    for item in carried:
+        if not isinstance(item, dict):
+            errs.append("carried source must be an object")
+            continue
+        if (item.get("kind") not in ("drive", "gmail")
+                or not isinstance(item.get("id"), str) or not item["id"].strip()
+                or not isinstance(item.get("reason"), str) or not item["reason"].strip()):
+            errs.append("carried source needs kind, id and reason")
+        if type(item.get("carry_count")) is not int or item["carry_count"] < 1:
+            errs.append("carried source needs a positive integer carry_count")
+        key = (str(item.get("kind")), str(item.get("id")))
+        if key in seen:
+            errs.append(f"source {item.get('id')} carried more than once")
+        seen.add(key)
+    for kind, listed, opened in (("drive", "drive_docs_in_window", "drive_docs_opened"),
+                                 ("gmail", "gmail_listed", "gmail_opened")):
+        counts = (cov.get(listed), cov.get(opened))
+        if any(type(v) is not int or v < 0 for v in counts):
+            errs.append(f"{kind} coverage needs listed and opened counts")
+        elif counts[0] - counts[1] != sum(isinstance(i, dict) and i.get("kind") == kind for i in carried):
+            errs.append(f"{kind} unread gap does not match carried sources")
+    for line in run.get("could_not") or []:
+        if any(token.lower() in str(line).lower() for token in ("403", "502", "CONNECT_TIMEOUT", "not available")):
+            errs.append(f"source unavailable: {line}")
+    return errs
 
 
 def verify(run, findings, ledger=None, slack_dm=None):
@@ -128,6 +172,8 @@ def verify(run, findings, ledger=None, slack_dm=None):
             errs.append("coverage.gmail_read is not true")
         if cov.get("gmail_listed") is None:
             errs.append("coverage.gmail_listed is missing")
+        elif cov.get("gmail_opened") is None or cov["gmail_opened"] < cov["gmail_listed"]:
+            errs.append(f"Gmail: {cov.get('gmail_opened')} opened of {cov['gmail_listed']} listed")
         if cov.get("outbox_stale") is None:
             errs.append("coverage.outbox_stale is missing")
         for line in run.get("could_not") or []:
@@ -137,7 +183,20 @@ def verify(run, findings, ledger=None, slack_dm=None):
             errs.append("complete, but the watermark did not advance")
     else:
         if run.get("watermark_before") and run.get("watermark_after") not in (None, run["watermark_before"]):
-            errs.append(f"{status} run advanced the watermark")
+            if status != "partial" or carry_ok(run):
+                errs.append(f"{status} run advanced the watermark")
+
+    carried = run.get("carried_sources") or []
+    if not isinstance(carried, list):
+        errs.append("carried_sources must be a list")
+        carried = []
+    if any(not isinstance(item, dict) for item in carried):
+        errs.append("carried source must be an object")
+        carried = [item for item in carried if isinstance(item, dict)]
+    for item in carried:
+        if (type(item.get("carry_count")) is int and item["carry_count"] >= 3
+                and f"unreadable-source-{item.get('id')}" not in (run.get("findings_new_keys") or [])):
+            errs.append(f"source {item.get('id')} carried 3 times: raise it as a finding")
 
     # The open set: every open finding was re-evaluated this run.
     n = len(findings)
@@ -154,10 +213,15 @@ def verify(run, findings, ledger=None, slack_dm=None):
             errs.append(f"findings_carried + findings_resolved is {accounted}, fewer than the {n} open findings")
 
     # The claims against the harness's own record of the calls.
+    if not isinstance(cov, dict):
+        cov = {}
+    facts = None
     if ledger is not None:
         facts, probs = ledger_facts(ledger)
         errs += probs
-        if status == "complete":
+        if not facts["calls"]:
+            errs.append("ledger: no calls recorded; a missing or empty ledger cannot verify a check-in")
+        if status in ("complete", "partial"):
             claimed_docs = cov.get("drive_docs_opened") or 0
             if len(facts["docs_opened"]) < claimed_docs:
                 errs.append(f"ledger: {len(facts['docs_opened'])} distinct documents opened, run claims {claimed_docs}")
@@ -172,11 +236,33 @@ def verify(run, findings, ledger=None, slack_dm=None):
                 errs.append("ledger: no read of the operator's Slack DM, run claims slack_dm_read")
             if cov.get("notes_read") is True and not facts["notes_read"]:
                 errs.append("ledger: the notes collection was never read, run claims notes_read")
-            missing = sorted(f["key"] for f in findings if f["key"] not in facts["findings_written"])
-            if missing:
-                errs.append("ledger: no board write for open findings claimed as re-evaluated: " + ", ".join(missing))
-            if facts["calls"] < 5:
-                errs.append(f"ledger: only {facts['calls']} calls recorded; a check-in makes dozens")
+            if status == "complete":
+                missing = sorted(f["key"] for f in findings if f["key"] not in facts["findings_written"])
+                if missing:
+                    errs.append("ledger: no board write for open findings claimed as re-evaluated: " + ", ".join(missing))
+                if facts["calls"] < 5:
+                    errs.append(f"ledger: only {facts['calls']} calls recorded; a check-in makes dozens")
+
+    pending = run.get("pending_in") or []
+    if not isinstance(pending, list):
+        errs.append("pending_in must be a list")
+        pending = []
+    for item in pending:
+        if not isinstance(item, dict):
+            errs.append("pending source must be an object")
+            continue
+        source_id, kind = item.get("id"), item.get("kind")
+        if facts is not None:
+            opened = source_id in facts["docs_opened"] if kind == "drive" else (
+                kind == "gmail" and source_id in facts["gmail_ids_opened"])
+        else:
+            opened = source_id in (run.get("opened_ids") or [])
+        old_count = item.get("carry_count")
+        continued = type(old_count) is int and any(
+            c.get("kind") == kind and c.get("id") == source_id
+            and type(c.get("carry_count")) is int and c["carry_count"] == old_count + 1 for c in carried)
+        if not opened and not continued:
+            errs.append(f"pending source {source_id} was neither opened nor carried with carry_count + 1")
 
     # A check cannot be clean while an open finding of that check exists.
     open_checks = {f.get("check") for f in findings if f.get("check")}
