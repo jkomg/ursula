@@ -59,7 +59,7 @@ def main(argv):
         Path(opts["--ledger"]).parent.mkdir(parents=True, exist_ok=True)
         Path(opts["--ledger"]).touch()
     errs = V.verify(run, findings, opts["--ledger"], opts.get("--slack-dm"))
-    facts, _ = V.ledger_facts(opts["--ledger"])
+    facts, _ = V.ledger_facts(opts["--ledger"], this_session=True)
     verified = not errs
 
     horizon = now + datetime.timedelta(hours=36)

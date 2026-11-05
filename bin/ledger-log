@@ -35,7 +35,7 @@ LEDGER = os.environ.get("URSULA_LEDGER", "").strip()
 ACTIVE = bool(LEDGER) or ROLE == "checkin" or (not ROLE and REMOTE)
 LEDGER = LEDGER or "/var/tmp/ursula-ledger/ledger.jsonl"
 
-KEEP = ("action", "collection", "doc_id", "documentId", "fileId", "file_id", "id", "channel_id",
+KEEP = ("action", "collection", "doc_id", "documentId", "fileId", "file_id", "id", "messageId", "threadId", "channel_id",
         "q", "query", "jql", "cloudId", "maxResults", "userId", "calendarId", "timeMin", "timeMax",
         "message_ts", "oldest", "latest", "issueIdOrKey", "pageId")
 

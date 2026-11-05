@@ -39,9 +39,14 @@ class CheckinVerify(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.folder = Path(self.tmp.name)
 
-    def ledger(self, calls=FULL):
-        """Write the hash-chained ledger entries used by test_session_verify.py."""
+    def ledger(self, calls=FULL, marker=True):
+        """Write the hash-chained ledger entries used by test_session_verify.py.
+
+        A real hooked session starts with a session_start marker; marker=False omits it.
+        A call's extra dict may override ts and session."""
         lines, prev = [], '0' * 64
+        if marker and calls and not any(c[0] == 'session_start' for c in calls):
+            calls = [('session_start', {'id': 'startup'})] + list(calls)
         for seq, call in enumerate(calls, 1):
             tool, args, *extra = call
             entry = dict(seq=seq, ts=NOW, session='s', tool=tool, args=args, error=False,
@@ -99,6 +104,30 @@ class CheckinVerify(unittest.TestCase):
                 entry = json.loads(path.read_text().splitlines()[-1])
                 self.assertEqual(entry.get('oversize', False), expected)
                 self.assertEqual(entry['error'], error)
+
+    def test_real_hook_records_gmail_ids_and_they_count_per_session(self):
+        # End to end through bin/ledger-log: the ids the distinct count needs are written,
+        # whether top-level, nested under params (gws_*), or named messageId.
+        path = self.folder / 'hook.jsonl'
+        events = [dict(hook_event_name='SessionStart', session_id='x', source='startup'),
+                  dict(session_id='x', tool_name='mcp__g__google_gmail_messages_get',
+                       tool_input={'userId': 'me', 'id': 'm1'}, tool_response={'id': 'm1'}),
+                  dict(session_id='x', tool_name='mcp__g__google_gmail_messages_get',
+                       tool_input={'userId': 'me', 'id': 'm1'}, tool_response={'id': 'm1'}),
+                  dict(session_id='x', tool_name='mcp__g__gws_gmail_users_threads_get',
+                       tool_input={'params': {'userId': 'me', 'id': 't9'}}, tool_response={'id': 't9'}),
+                  dict(session_id='x', tool_name='mcp__g__gmail_read',
+                       tool_input={'messageId': 'm2'}, tool_response={'id': 'm2'}),
+                  dict(session_id='x', tool_name='mcp__g__gws_gmail_read',
+                       tool_input={'args': ['--id', 'm3']}, tool_response={'id': 'm3'})]
+        for ev in events:
+            proc = subprocess.run([sys.executable, str(ROOT / 'bin/ledger-log')], input=json.dumps(ev),
+                                  env=dict(os.environ, URSULA_LEDGER=str(path)), capture_output=True, text=True)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+        facts, errs = m.ledger_facts(str(path), this_session=True)
+        self.assertEqual(errs, [])
+        self.assertEqual(facts['gmail_ids_opened'], {'m1', 't9', 'm2'})
+        self.assertEqual(facts['gmail_opened'], 3)
 
     def test_oversize_doc_read_counts_but_other_errors_do_not(self):
         calls = [('gws_docs_documents_get', {'documentId': 'large'}, {'error': True, 'oversize': True}),
@@ -229,6 +258,45 @@ class CheckinVerify(unittest.TestCase):
             out = self.close(self.partial(), calls)
             self.assertFalse(out['verified'], tool)
             self.assertIsNone(out['state_checkin'], tool)
+
+    def test_calls_from_an_earlier_session_do_not_verify_a_new_run(self):
+        # 4 Nov audit: every call dated 1 October still verified a 2 November run.
+        old = [(t, a, {'ts': '2026-10-01T09:00:00Z', 'session': 'old'}) for t, a in FULL]
+        calls = [('session_start', {'id': 'old'}, {'ts': '2026-10-01T08:59:00Z', 'session': 'old'})] + old + \
+                [('session_start', {'id': 'startup'}, {'session': 'new'})]
+        errs = m.verify(run(), [], self.ledger(calls))
+        self.assertTrue(any('no calls recorded' in e for e in errs), errs)
+        out = self.close(run(), calls)
+        self.assertFalse(out['verified'])
+        self.assertIsNone(out['state_checkin'])
+        self.assertEqual(out['ledger']['calls'], 0)
+
+    def test_concurrent_older_session_calls_do_not_count(self):
+        # Same clock, but another session's calls: they are not this run's evidence.
+        calls = [('session_start', {'id': 'startup'}, {'session': 'other'}),
+                 ('session_start', {'id': 'startup'}, {'session': 'new'})] + \
+                [(t, a, {'session': 'other'}) for t, a in FULL]
+        self.assertTrue(m.verify(run(), [], self.ledger(calls)))
+
+    def test_ledger_without_session_marker_fails(self):
+        errs = m.verify(run(), [], self.ledger(FULL, marker=False))
+        self.assertTrue(any('no session_start marker' in e for e in errs), errs)
+
+    def test_repeated_gmail_reads_count_once(self):
+        # 4 Nov audit: two reads of m1 passed a claim of two messages opened.
+        r = run()
+        r['coverage'].update(gmail_listed=2, gmail_opened=2)
+        calls = FULL + [('gws_gmail_users_messages_get', {'id': 'm1'})]
+        errs = m.verify(r, [], self.ledger(calls))
+        self.assertTrue(any('1 Gmail messages opened, run claims 2' in e for e in errs), errs)
+        calls = FULL + [('gws_gmail_users_messages_get', {'id': 'm2'})]
+        self.assertEqual(m.verify(r, [], self.ledger(calls)), [])
+
+    def test_gmail_read_without_an_id_does_not_count(self):
+        calls = [c for c in FULL if c[0] != 'gws_gmail_users_messages_get'] + [('gws_gmail_read', {})]
+        facts, _ = m.ledger_facts(self.ledger(calls), this_session=True)
+        self.assertEqual(facts['gmail_opened'], 0)
+        self.assertTrue(m.verify(run(), [], self.ledger(calls)))
 
     def test_malformed_new_source_lists_return_errors(self):
         for field in ('carried_sources', 'pending_in'):

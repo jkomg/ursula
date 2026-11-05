@@ -541,3 +541,87 @@ get the ledger-backed claim checks (`status in ("complete", "partial")`). One ac
 `opened_ids` was undocumented; it is now in `config/schema.md`, and only matters without
 `--ledger`. Local checks re-run by the lead: all six test files pass (17 new tests),
 `bin/install.sh --check` passes.
+
+## 2026-11-04 — repository baseline audit
+
+Audited commit `6d11f5a`; observations recorded at 2026-11-04T22:10:21Z.
+This was a repository audit, not a cadence or live acceptance run. No connector
+calls, board publication or runtime fixes were performed. Existing untracked
+`.DS_Store` was left untouched.
+
+**Executed:** `bin/install.sh --target all --check` passed; Python unittest
+discovery passed all 68 tests. The entrypoint is 359 lines. These checks validate
+local helpers and packaging constraints, not the cadence or host integration.
+
+**Open findings (not fixed):**
+
+1. **High — check-in evidence is not scoped to the current run.**
+   `scripts/checkin_verify.py:220` calls `ledger_facts(ledger)` without a cutoff;
+   `scripts/checkin_close.py` also reports facts from the entire ledger. A local
+   fixture with every call dated 1 October passed verification for the existing
+   2 November complete-run fixture with no errors. Old reads and finding writes
+   can therefore back a new run and permit watermark advancement. Bind evidence
+   to the harness-recorded session/run before verifying or reporting it.
+2. **High — repeated Gmail calls count as different messages read.**
+   `scripts/checkin_verify.py:91` counts calls, although distinct IDs are also
+   collected. A fixture claiming two listed and two opened messages passed with
+   two reads of `m1` and only one distinct message ID. Compare actual distinct
+   message coverage, with explicit thread-read semantics, before treating the
+   unread gap as closed. The shared ledger fact also feeds session verification.
+3. **High — sandbox calendar proposals can reach a real write.**
+   `artifact/index.html:1344` blocks dry-run and mode mismatches but permits an
+   item and current mode both set to sandbox. Evaluating the actual `whyNot`
+   function locally for a calendar-block proposal returned null (unblocked).
+   Its send branch at line 1335 inserts on the primary calendar after approval,
+   contrary to SKILL.md's sandbox rule that calendar changes remain proposals.
+   Enforce sandbox restrictions in both the approval and dispatch paths; also
+   check Jira outbox target routing against the sandbox project.
+
+The reproductions used temporary input records and the board's pure gate function;
+they did not mock connector responses or establish any live behavior. Independent
+model review remains pending; no external reviewer was invoked and no provider
+account authorization was inferred from this checkout's location.
+
+**Acceptance still outstanding in the recorded history:** cold installation end
+to end, the latest board changes in claude.ai, a real independent recount, and the
+4 November long-document/carry-forward changes in a live check-in. Documentation
+also needs a status refresh: README still calls the project early, CLAUDE.md's
+current-state section describes the September batch, and docs/release.md says
+`--target all` builds two bundles although the installer now builds three.
+
+### 5 Nov: the three findings fixed (local checks only, no claude.ai run)
+
+1. **Evidence scoped to the run.** `ledger_facts(..., this_session=True)` counts only
+   calls from the session of the latest `session_start` marker, from that marker on.
+   `checkin_verify.py` and `checkin_close.py` both use it. A ledger with no marker
+   fails. Writing the tests turned up a second defect: two sessions starting in the same
+   second resolved to the older one. Ties now go to the later line.
+2. **Gmail counted by distinct id.** `gmail_opened` is the number of distinct message or
+   thread ids read. Reads with no recorded id (`gws_gmail_read`) count as none.
+   `bin/ledger-log` now keeps `messageId` and `threadId`. This also tightens
+   `session_verify.py`, which shares the fact.
+3. **Sandbox gate.** `whyNot` refuses a sandbox `calendar_block`, and a sandbox
+   `jira_comment` outside `config/run.sandbox_project`. `send()` re-runs the gate before
+   any write. The audit's note on Jira routing in sandbox is covered by the second rule.
+
+**Executed by the lead:** `python3 -m unittest discover -s test` passed 73 tests (5 new,
+one per reproduction plus the tie and the missing-marker cases).
+`bin/install.sh --target all --check` passed. The board's real `whyNot` was evaluated
+in node for seven cases: sandbox calendar, sandbox Jira inside and outside the project,
+sandbox with no project set, live calendar, live Jira, and dry-run. Only the expected
+cases came back unblocked. `node --check` passes on the board's inline script.
+
+**Not yet observed:** the republished board in claude.ai, and a live check-in under
+the session scoping. One risk: on a host whose SessionStart hook does not fire,
+check-ins that verified before will now come back partial. `bin/rails-check` reports
+whether the marker is being recorded.
+
+**Review (Mirantis LiteLLM, default model, one round; `.handoffs/20261105-123022-litellm/`).**
+It raised five defects. Four were rebutted against the code: the config race (`runMode`
+and `sandboxProject` are set in one snapshot callback, and `runMode` stays null until
+then), "`str()` undefined" (it is at `artifact/index.html:742`), `since` being
+overridden (only the later cutoff is kept, so a caller can narrow the window, not widen
+it), and unknown Gmail tools (already excluded by tool name). One gap was accepted:
+nothing showed `bin/ledger-log` actually writes the ids. A new test now feeds six real
+hook events through `bin/ledger-log` and gets three distinct ids. The suite is 74 tests,
+all passing. No second round was needed.

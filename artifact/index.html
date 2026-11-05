@@ -1297,7 +1297,7 @@ function watchHires(){
    the receipt. Rules and fields: reference/outbox.md. The page sends nothing for a
    dry-run item, for an item proposed in another mode than the current one, or for an
    expired one. Bodies are shared data: textContent only. */
-let outbox = [], runMode = null, voice = null, showDecided = false;
+let outbox = [], runMode = null, sandboxProject = "", voice = null, showDecided = false;
 const OPEN_OB = new Set(["proposed"]);
 const KIND = {email:"Email", slack:"Slack message", jira_comment:"Jira comment", calendar_block:"Focus block"};
 const LEVELS = [
@@ -1316,6 +1316,10 @@ function payloadOf(r){
   return r;
 }
 async function send(o, body){
+  // The same gate as the button, again at dispatch: a write must not depend on the
+  // render that drew the button still being current.
+  const why = whyNot(o);
+  if(why) throw {code:"blocked", detail: why};
   const t = o.target || {};
   if(o.kind === "email"){
     const p = payloadOf(await mcp.callTool(CFG.GMAIL, "gws_gmail_send",
@@ -1345,6 +1349,18 @@ function whyNot(o){
   if(runMode === null) return "Checking the run mode…";
   if(o.mode === "dry-run" || runMode === "dry-run") return "Dry run: nothing sends. Mark whether it is right.";
   if(runMode && o.mode && o.mode !== runMode) return "Proposed in " + o.mode + " mode; Ursula is now in " + runMode + ". Not sent.";
+  // Sandbox (docs/sandbox.md): calendar changes stay proposals, because a Jira sandbox
+  // does not isolate calendars, and Jira writes go only to config/run.sandbox_project.
+  // The 4 Nov audit found a sandbox focus block passed this gate and was inserted on the
+  // operator's primary calendar after approval.
+  if(o.mode === "sandbox" || runMode === "sandbox"){
+    if(o.kind === "calendar_block") return "Sandbox: calendar changes stay proposals; a Jira sandbox does not isolate calendars. Not sent.";
+    if(o.kind === "jira_comment"){
+      const t = o.target || {}, key = str(t.key || o.target);
+      if(!sandboxProject) return "Sandbox, but config/run.sandbox_project is not set. Not sent.";
+      if(key.split("-")[0].toUpperCase() !== sandboxProject) return "Sandbox: Jira writes go only to " + sandboxProject + "; " + (key || "this item") + " is outside it. Not sent.";
+    }
+  }
   if(expired(o)) return "Expired " + str(o.expires_at).slice(0,16).replace("T"," ") + ". Not sent.";
   if(!mcp) return "No connector access in this view.";
   return null;
@@ -1514,7 +1530,12 @@ async function sendNote(){
 
 function watchOutbox(){
   if(!db){ $("ostatus").textContent = "Database not available in this view."; renderOutbox(); renderVoice(); return; }
-  db.doc("config/run").onSnapshot(s => { runMode = s.exists ? str((s.data() || {}).mode) || "dry-run" : "dry-run"; renderOutbox(); }, () => {});
+  db.doc("config/run").onSnapshot(s => {
+    const d = s.exists ? (s.data() || {}) : {};
+    runMode = str(d.mode) || "dry-run";
+    sandboxProject = str(d.sandbox_project).trim().toUpperCase();
+    renderOutbox();
+  }, () => {});
   $("tellsend").addEventListener("click", sendNote);
   db.collection("notes").orderBy("at","desc").limit(30).onSnapshot(snap => {
     notes = snap.docs.map(d => Object.assign({_id: d.id}, d.data() || {}));

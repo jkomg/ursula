@@ -43,12 +43,18 @@ def open_findings(folder):
     return out
 
 
-def ledger_facts(path, since=None):
+def ledger_facts(path, since=None, this_session=False):
     """Read the ledger written by bin/ledger-log; return (facts, problems).
 
     The whole chain is verified, but only calls at or after `since` (ISO UTC) count.
     A desktop ledger persists across sessions; without the cut an earlier session's
-    Gmail read would satisfy this one's claim."""
+    Gmail read would satisfy this one's claim.
+
+    With this_session, only calls from the session of the latest `session_start` marker
+    (written by the SessionStart hook, not the model) count, from that marker on. The
+    4 Nov audit found a check-in verified against calls all dated a month earlier,
+    because the check-in path read the whole ledger. No marker means the run's own calls
+    cannot be told apart from earlier ones, so nothing counts and that is a problem."""
     probs, calls, prev = [], [], "0" * 64
     for n, raw in enumerate(Path(path).read_bytes().splitlines(), 1):
         try:
@@ -61,7 +67,20 @@ def ledger_facts(path, since=None):
             break
         prev = hashlib.sha256(raw).hexdigest()
         calls.append(e)
-    starts = [str(c.get("ts", "")) for c in calls if c.get("tool") == "session_start"]
+    marks = [c for c in calls if c.get("tool") == "session_start"]
+    # Latest by clock; on a same-second tie the later line (the ledger is append-only).
+    mark = max(reversed(marks), key=lambda c: str(c.get("ts", ""))) if marks else None
+    starts = [str(c.get("ts", "")) for c in marks]
+    if this_session:
+        if mark is None:
+            probs.append("ledger: no session_start marker, so this run's calls cannot be told from an earlier "
+                         "run's; the SessionStart hook is not recording (run bash bin/rails-check)")
+            calls = []
+        else:
+            start = str(mark.get("ts", ""))
+            if not since or since.replace("+00:00", "Z")[:19] < start[:19]:
+                since = start
+            calls = [c for c in calls if c.get("session") == mark.get("session")]
     if since:
         cut = since.replace("+00:00", "Z")[:19]
         calls = [c for c in calls if str(c.get("ts", ""))[:19] >= cut]
@@ -79,16 +98,21 @@ def ledger_facts(path, since=None):
             if (not c.get("error") or c.get("oversize"))
             if named(c, "docs_get", "documents_get", "read_file_content", "download_file_content", "files_get",
                      "files_export", "files_download")} - {None}
+    gmail_ids = {arg(c, "id", "messageId", "threadId") for c in ok
+                 if "gmail" in c["tool"] and named(c, "messages_get", "threads_get", "gmail_read")} - {None}
     facts = {
         "calls": sum(1 for c in calls if c.get("tool") != "session_start"),
         "errors": len(calls) - len(ok), "head": prev,
         "session_start": max(starts) if starts else None,
         "first": calls[0]["ts"] if calls else None, "last": calls[-1]["ts"] if calls else None,
         "docs_opened": docs,
-        "gmail_ids_opened": {arg(c, "id", "messageId") for c in ok
-                             if "gmail" in c["tool"] and named(c, "messages_get", "threads_get", "gmail_read")} - {None},
+        "gmail_ids_opened": gmail_ids,
         "gmail_listed": sum(1 for c in ok if "gmail" in c["tool"] and named(c, "messages_list", "threads_list", "triage")),
-        "gmail_opened": sum(1 for c in ok if "gmail" in c["tool"] and named(c, "messages_get", "threads_get", "gmail_read")),
+        # Distinct ids, not calls: the 4 Nov audit passed a claim of two messages opened
+        # from two reads of the same message. A thread read counts once per thread id; a
+        # read whose id the ledger did not keep (gws_gmail_read takes free-form args)
+        # proves no particular message and does not count.
+        "gmail_opened": len(gmail_ids),
         "slack_dm_reads": {arg(c, "channel_id") for c in ok if c["tool"] == "slack_read_channel"} - {None},
         "calendar_listed": sum(1 for c in ok if "calendar" in c["tool"] and named(c, "events_list", "agenda", "instances")),
         "jira_searched": sum(1 for c in ok if named(c, "searchJiraIssuesUsingJql", "JiraIssuesUsingJql")),
@@ -217,7 +241,7 @@ def verify(run, findings, ledger=None, slack_dm=None):
         cov = {}
     facts = None
     if ledger is not None:
-        facts, probs = ledger_facts(ledger)
+        facts, probs = ledger_facts(ledger, this_session=True)
         errs += probs
         if not facts["calls"]:
             errs.append("ledger: no calls recorded; a missing or empty ledger cannot verify a check-in")

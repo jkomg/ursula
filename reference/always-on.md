@@ -100,7 +100,10 @@ so as a skipped source. The other two:
    window is covered. Then **open every message the query returned**, at least with
    `format: metadata`, and read in full anything from a person addressed to the
    operator. `gmail_listed` is the count the query returned and `gmail_opened` the
-   count opened; a complete run has the two equal. A list of ids is not a read, and
+   count opened; a complete run has the two equal. Close-out counts opened messages by
+   distinct id from `messages_get` (or `threads_get`, once per thread), so open each
+   message by its id: reading the same message twice counts once, and `gws_gmail_read`,
+   whose id the ledger does not keep, counts as none. A list of ids is not a read, and
    neither is a sample: runs on 3 Nov listed about 60 messages, opened 8 to 10 "to save
    budget", and were still recorded as having read mail. If the exclusion list leaves
    more than 40 messages, it is missing a noisy sender: open them all anyway this run,
@@ -290,7 +293,9 @@ call to a hash-chained ledger with the harness's clock (`docs/governance.md`).
 2. Run `python3 scripts/checkin_close.py RUN.json FINDINGS_DIR --level <config/voice.level> --slack-dm <config/checkins.slack_dm>`. (The ledger is
    found from `URSULA_LEDGER`, default `/var/tmp/ursula-ledger/ledger.jsonl`; do not read
    or write that file directly, the guard denies it.) It verifies the record against the open findings and
-   the ledger, and prints `status_allowed`, `final_line`, `state_checkin` and a `ledger`
+   the ledger, counting only calls from this session (the latest `session_start` marker
+   the SessionStart hook wrote, and calls with its session id from then on; a ledger with
+   no marker fails, and so does a run whose reads were made by another session), and prints `status_allowed`, `final_line`, `state_checkin` and a `ledger`
    summary.
 3. Write `status` as `status_allowed`, store `verified: {ok, errors}` and the `ledger`
    summary (including `head`) on the run record, and move `state/checkin` **only to the

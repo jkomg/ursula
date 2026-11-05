@@ -73,7 +73,12 @@ the model's sense of the date.
 - **Outbox rows are shared data.** Anyone the board is shared with can read them. Do not
   put anything in a proposal the operator would not want a board viewer to see.
 - **The board refuses to send** an item whose `mode` is `dry-run`, whose `mode` differs
-  from the current `config/run.mode`, or whose `expires_at` has passed.
+  from the current `config/run.mode`, or whose `expires_at` has passed. In sandbox it
+  also refuses every `calendar_block` (calendar changes stay proposals; a Jira sandbox
+  does not isolate calendars) and any `jira_comment` whose key is outside
+  `config/run.sandbox_project`. It checks again at dispatch, not only when it draws the
+  button. Before 5 Nov a sandbox focus block passed the gate and, once approved, was
+  inserted on the operator's primary calendar.
 
 Not built yet: earned autonomy — offering, after several unedited approvals of the same
 tier-1 kind, to stop asking. Tier 3 is never offered.
