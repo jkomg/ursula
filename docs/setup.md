@@ -10,6 +10,19 @@ into your artifact database, and publishes your board.
 
 Expect fifteen minutes.
 
+## 0. Organization and agents
+
+Before connector setup, follow `reference/organization-profiles.md`. Ask: “Is this
+for Mirantis, IREN, a personal account, or another organization? You can configure
+one or more.” Bind this project to one profile and select approved agents and an
+independent reviewer. Keep each profile's accounts, connectors and state separate.
+The same interview applies in Claude, ChatGPT/Codex, Gemini and T3; only verified
+host capabilities are usable. Existing users must identify their current state's
+organization before migration; never automatically label old data Mirantis.
+The same step asks which Claude, ChatGPT/Codex and LiteLLM accounts the operator
+has, which runs first, and which reviews. Connecting an account happens in the
+host; the interview only records and verifies it.
+
 ## 1. Install
 
 Add the skill through the Skills menu in claude.ai and run the Monday and Thursday
@@ -19,8 +32,10 @@ database (`docs/routine.md`). The repo is where the skill is edited.
 
 ## 2. Turn on connectors
 
-All four are required. If any is missing you will get a partial run that looks like
-a complete one.
+The required capabilities are listed below. Use only connectors authorized for the
+selected organization; the Mirantis gateway is a Mirantis example, not a dependency
+for IREN or personal profiles. Equivalent connectors are acceptable after real
+identity and read checks. Missing capabilities make setup incomplete.
 
 | Connector | Used for |
 |---|---|
@@ -126,7 +141,9 @@ below is true. Claude must not report setup as complete otherwise.
 
 ### Required state
 
-Eleven documents, every field populated or explicitly recorded as unknown with a reason:
+The profile registry and bound profile context (`config/profiles` and
+`config/context`), plus these eleven documents, with every field populated or
+explicitly recorded as unknown with a reason:
 
 `config/jira` · `config/labels` · `config/cadence` · `config/numbers` ·
 `config/people` · `config/policies` · `config/packs` · `config/run` · `config/voice` ·
@@ -137,6 +154,10 @@ are off, which is a valid setup.
 
 A field left out silently is a failure. A field recorded as `null` with a note saying
 why is acceptable and gets reported.
+
+Organization verification must precede the reads below: confirm project binding,
+approved primary/reviewer sources, account/workspace evidence, connector ownership
+and separate state storage. Unknown identity blocks private connector reads.
 
 ### Verification — by execution, never by assertion
 
@@ -214,6 +235,31 @@ Ask Claude to read back your config. Confirm:
 - The board shows work, and sorts the way you expect
 - Undated items are at the bottom where they belong — that is correct behaviour,
   not a bug
+
+## Moving hosts (desktop to claude.ai)
+
+Neither host inherits the other's state, and two live stores diverge. A move is
+therefore deliberate, one way, and re-verified. It was first used on 2026-10-28, when an
+operator set up on a desktop host and then wanted the live claude.ai board.
+
+1. **On the old host,** write an import file: the `config` and `state` collections plus
+   `runs`, `findings`, `hires` and `changesets`, keyed by document id, as in
+   `reference/runtime.md`. Set `config/run.status` to `incomplete` in the import, with the
+   claude.ai checks listed as missing. Then mark the old store retired (`config/run.home`
+   names the new host). A session that finds its store retired stops and says where
+   Ursula now lives.
+2. **In claude.ai,** upload the current skill zip. In a fresh chat, attach the import
+   file and say "Move my Ursula here". Confirm the claude.ai account belongs to the
+   import's organization (`config/context`) before reading the file.
+3. Claude writes each document with `write_db` and reads every one back. A document
+   that does not read back identically is reported, not assumed.
+4. Re-run the verification table in 3b, rows 1 to 6, in claude.ai. The old host's
+   connector checks do not transfer: different host, possibly different accounts.
+5. Publish the board (row 8). Then do the readback (row 9) and mark setup complete.
+
+What does not move: hooks, the call ledger and the LiteLLM antagonist. claude.ai
+cannot run them, so the antagonist records `pending` (`reference/delegation.md`). The
+private policy file and the old state stay on the old machine as a retired archive.
 
 ## Multiple operators
 

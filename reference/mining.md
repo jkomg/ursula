@@ -88,6 +88,22 @@ meeting ends and then touched again whenever anyone opens or tidies it. Filterin
 yesterday looks new. Observed: a 9 September meeting reappeared in a 22 September
 window.
 
+**But `createdTime` is early.** Gemini creates the document when note-taking starts and
+shares it when the meeting ends; for a meeting someone else convened, it reaches the
+operator only then. A window that closed between the two never sees it, and the next
+window starts after its `createdTime`. So search from 24 hours before the watermark and
+drop ids already read (`state/checkin.read_sources` for check-ins, `state/ingested` for
+the cadence). Calendar attachments on events that ended in the window catch the same
+documents from the other side.
+
+**Long documents.** A notes document with a transcript tab passes 90,000 characters
+for an hour's meeting, and `read_file_content` fails on it with a size error. Export it
+as plain text (`gws_drive_files_export`, `mimeType: text/plain`) or read the tabs with
+`gws_docs_documents_get` (`includeTabsContent: true`), the Notes tab first. Read the
+transcript only when the Notes tab has no summary. A document read only from the
+harness's saved overflow file counts as opened only if the read call itself returned
+the content.
+
 Belt and braces — the meeting date is in the title, `<name> - YYYY/MM/DD HH:MM TZ -
 Notes by Gemini`. Parse it and discard anything older than the watermark regardless of
 what the timestamps say. Where the parsed date and `createdTime` disagree by more than a
@@ -146,6 +162,16 @@ headers and a snippet cheaply; reserve `full` for messages actually being read.
 Then sweep for commitments made directly over mail — threads where the operator
 promised something, or was asked for something and has not replied. These never
 appear in meeting notes and are a common source of self-blocking findings.
+
+**Exclude automated mail in the query, then open everything left.** An operator's
+inbox is mostly Jira, calendar, monitoring and list mail: about 200 messages a day, of
+which a handful are from people. Triaging that in the model runs out of budget, and the
+runs did exactly that, opening 8 of 61. Instead build the query as
+`after:<epoch> before:<epoch> -from:<each sender in config/checkins.gmail_exclude>
+-category:promotions -category:social`, page to the end, and open every result. Seed
+the exclusion list at setup from the senders of the last week's mail (Jira, Google
+Calendar, Drive notifications, alerting lists), and add to it when a run proposes a
+sender. Never exclude `gemini-notes@google.com`: that is the notes index.
 
 ## Slack
 

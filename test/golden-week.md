@@ -278,3 +278,374 @@ operator, and propose → approve on the board → Gmail send with the receipt k
   final line is the notification. Email-to-self and the Slack DM log are optional and
   need the guard settings on the routine's environment; without them every connector
   write is blocked, confirmed on the first check-in (`guard: active`, cloud: true).
+
+## 2026-10-27 — source receipt gate (local helper validation)
+
+Added private input capture through a configured read-only adapter, exact source
+hashes, run IDs, quote membership checks, strict required fields and duplicate-ID
+rejection. Weekly and always-on instructions require the receipt gate before
+external writes and watermark advancement. Added a portable independent auditor
+prompt; it is not an automatically registered agent. Mirantis review is restricted
+to authorized Mirantis inputs and an active Mirantis provider.
+
+13 local helper tests passed, including changed text, absent sources, mismatched
+runs, whitespace quotes, empty receipts, duplicate IDs/JSON fields, partial coverage,
+exact file hashes and nonzero CLI failure without raw content. Existing snapshot
+renderer tests also passed. `bin/install.sh --target all --check` passed. The local
+OpenCode builder was interrupted after exceeding its budget; the lead fixed the
+draft and invalid fixture hashes. Independent review remains pending.
+
+No real connector ingestion, board write, cadence run or hosted auditor was tested.
+No production watermark advanced. Adapter execution does not prove completeness or
+authenticity; quote membership does not prove semantic support. The host workflow
+must invoke the gate; arbitrary direct connector or board UI writes are not
+technically intercepted. No personal input artifacts were added to the bundle.
+
+## 2026-10-27 organization routing update
+
+Added multi-profile setup, single-organization project binding, conversational
+profile/agent requests and private state separation. Added a deterministic manifest
+validator; this validates policy intent, not account identity or live routing.
+Claude/ChatGPT/Gemini/T3 end-to-end profile transitions and live connector ownership
+checks remain unverified. No live state or accounts migrated.
+
+Local validation: 22 helper tests passed, including cross-profile rejection,
+Mirantis-only LiteLLM opt-in, distinct provider families, duplicate JSON keys,
+malformed/oversize CLI inputs and explicit pending-identity output. Bundle checks
+passed. A bounded local qwen3-coder:30b design attempt asked for direction rather
+than completing review and was cancelled. IREN Claude Sonnet 5.5 reviewed the
+implementation; first-round gaps were addressed with profile IDs distinct from
+organization, real-manifest testing in the IREN app and broader negative tests.
+No token savings or live identity/switching verification is claimed.
+
+## 2026-10-26 / 27 — check-in coverage defects (live board, from the run log)
+
+Found by the operator asking why a "0 notes, 0 DMs" line meant anything, then reading the
+runs collection. Four defects in four check-ins:
+
+- **Skipped sources recorded as complete.** The 16:11 check-in listed two new notes
+  documents by title, skipped Gmail, wrote `complete` and advanced the watermark; the
+  summary line said nothing needed the operator. The 12:09 check-in listed 25 of about
+  200 message ids and triaged none, and did not use Slack at all. Fix: Drive notes,
+  Gmail and the Slack DM are required sources; a run that skipped any is `partial`,
+  leaves the watermark, and says so in the final line at every level.
+- **Open findings dropped.** The 27 Oct 08:27 check-in wrote `findings_carried: 0`,
+  `calendar-collision-today` clean and "nothing due today" while four findings were open,
+  including an 11:30 collision that morning and a review due close of business. Fix: the
+  open set is re-evaluated first on every run, imminent findings are always named in the
+  final line, and a check cannot be listed clean while an open finding of it exists.
+- **Findings never closed.** Fifteen collision and due-date findings from weeks 40 to 43
+  were still `open` on 27 Oct. Fix: a cause that is plainly gone is closed by the
+  check-in with a `close_note`.
+- **Expired outbox item left unmentioned** (12:09 run, item from 8 Oct). Fix: counted
+  and named in the summary and final line.
+
+New: `scripts/checkin_verify.py` checks a run record against the open findings. Run
+against the two live records above it fails both, for the reasons listed. Run against a
+constructed good record it passes, and fails the same record when `could_not` admits an
+unread source. It checks that a record is consistent, not that the sources were read.
+No claude.ai run of the new rules yet.
+
+### Same day: harness-written evidence (hooks and scripts, no claude.ai run)
+
+Added `bin/ledger-log` (PostToolUse), `bin/guard-ledger`, `scripts/checkin_close.py`,
+`scripts/audit_trend.py` and `docs/governance.md`. Exercised here against synthetic hook
+events (our own code, not a connector): the ledger chains and records errors; a run that
+claims 5 documents and 9 mails when the ledger shows 2 and 1 is refused, is `partial`, gets
+no watermark and a final line that leads with the gap; deleting a ledger line is reported as
+a broken chain; the guard denies a command naming the ledger and allows the close script;
+with two findings given `due_at` the final line names both. The audit, run over the 57
+real check-in records, shows 0 verified runs, 25 to 53 per cent partial weeks and 18
+silent-green runs. Not yet proven: that the PostToolUse hook receives `tool_response` and
+`session_id` as assumed on the claude.ai cloud environment, that the ledger path is
+writable there, and that a real check-in follows the close-out. First thing to read after
+the next check-in: its `ledger` block and `verified.ok`; if `calls` is 0 the hook is not
+running on that environment and every run will report `partial` (correctly).
+
+## 2026-10-28 — Delegation, primary failover and reviewer fallback
+
+**Symptom.** Mid-setup, the Codex primary hit its workspace spend cap during a
+calendar change. T3 handed the thread to Claude with a summary; whether the write had
+landed was known only because a receipt had been saved to private state first. A
+full cadence also loads every source into one context.
+
+**Change.** `reference/delegation.md`: read-only workers mine per source and write
+their own raw-input file for the receipt gate; the primary keeps reconcile, analysis,
+approvals and writes, and saves `state/handoff` from the frozen window onwards.
+Project policy version 2 adds `primary_order`, `review_order` and a generic `litellm`
+source any organization can bind; the setup interview asks for each account and
+plan. Version 1 policies still validate.
+
+**Review.** Codex attempted first and failed on the spend cap; the fallback ran on
+Mirantis LiteLLM `gpt-6-sol` (returned model confirmed). Five findings, all
+accepted: takeover needs a shared state store (claude.ai artifact DB and Codex files
+are not); workers must freeze source text, not just quotes; an explicit `--agent`
+bypassed the order and the unavailable list (fixed, tested); a GPT gateway cannot
+review a Codex primary (now explicit: pending); first checkpoint must precede
+mining. 30 helper tests and both-target package checks pass.
+
+**Not proven.** No cadence has run with workers or a mid-run takeover. First test:
+a dry-run Monday in T3 with Claude primary and per-source workers; then stop the
+primary after Pass 1 and resume in Codex from `state/handoff`.
+
+
+## 2026-10-28 — Desktop rails actually run; antagonist on routine work
+
+**Symptom.** On a Windows desktop every hook had been failing silently since it was
+installed. `.claude/settings.json` called `python3`, which there is the Microsoft Store
+stub (exit 49), and Claude Code treats any exit other than 0 or 2 as non-blocking.
+`ledger-log` also imported `fcntl`, which does not exist on Windows. `guard-secrets`
+watched Bash only, while the host also offers a PowerShell tool. `bin/litellm` had no
+Windows key store. `bin/install.sh` could not build on Windows (no `zip` in Git Bash).
+Nothing reported any of it.
+
+**Change.**
+- `bin/run-hook` finds a real Python, blocks the call if there is none, and turns a
+  crashing guard's exit into 2.
+- `guard-secrets` covers PowerShell environment and credential-store reads.
+- `ledger-log` locks with `msvcrt` on Windows.
+- `bin/litellm` reads Windows Credential Manager (`ursula-litellm`).
+- `bin/rails-check` feeds each rail a test event and reports what works.
+- `bin/install.sh --target desktop` builds a workspace zip with the rails and
+  operator-facing AGENTS.md/CLAUDE.md, and falls back to Python's zipfile.
+
+The antagonist now runs on every write batch and on check-in drafts before they are
+written (`reference/delegation.md`). If it cannot run, writes proceed on approval and
+the receipt gate, recorded as pending; the operator chose this so claude.ai hosts
+still work. Objected actions are held.
+
+**Observed.** After the change, in T3 with Claude, the live hook denied a Bash command
+naming the key variable. It also denied the maintainer's own commit command, because
+this entry's text named the patterns: a false positive on documentation, so edit docs
+with the file tools. `rails-check` passes on this machine and from an unzipped desktop
+zip. A fake crashing interpreter now blocks (exit 2).
+
+**Review.** Codex was unavailable (spend cap, failed attempt earlier this session), so
+the review ran on LiteLLM `gpt-6-sol`. Six findings:
+1. Hooks do not run under Codex. Accepted; documented per host.
+2. The check-in antagonist ran after writes. Fixed: it now runs on drafts.
+3. `ledger-log` swallows errors. Rebutted: `checkin_verify` fails a run whose claims
+   exceed the ledger.
+4. A crashing guard failed open. Fixed.
+5. Pending review contradicted the check-in completion rule. Resolved per the operator.
+6. A policy command was incomplete. Fixed.
+
+**Not proven.** No check-in or cadence has run the antagonist. Codex hooks are
+absent. The LiteLLM key is not yet stored on this machine. Whether the claude.ai
+sandbox could reach the gateway was not tested.
+
+## 2026-10-28 — A stored key that was one control character; moving hosts
+
+**Symptom.** After the operator stored the LiteLLM key with the documented credential
+command, `bin/litellm check` got a bare HTTP 400 page from the gateway. The stored
+secret was a single non-printable character: in a classic Windows console, Ctrl+V at a
+hidden prompt types a control character instead of pasting. Nothing said so.
+
+**Fix.** `bin/litellm store` prompts with hidden input, refuses control and non-ASCII
+characters, and writes the credential itself. It refuses to run without a real console:
+`isatty()` is true for NUL on Windows, and an agent's shell hung on the prompt until
+`GetConsoleMode` was added. On a rejected request, `check` reports the key's length and
+character classes, never its value. After re-storing: key accepted, 218 models.
+
+**Moving hosts.** The operator wanted the live claude.ai board after setting up on a
+desktop host. The board needs claude.ai's artifact database, so state cannot be shared;
+`docs/setup.md` now has a one-way move with re-verification, and `config/run.home`
+retires the old store so two primaries cannot diverge. Not yet run in claude.ai.
+
+**Review of the above** (LiteLLM `gpt-6-sol`, run through `bin/litellm chat`, the first use
+of the direct route). Two findings, both accepted:
+1. A console check cannot prove the operator is typing; an agent's interactive shell
+   passes it. `guard-secrets` now denies any agent command that runs the key store. The
+   live hook was seen denying it.
+2. Stripping NUL and tab before validation stored them instead of refusing. Only
+   spaces and line breaks are trimmed now.
+
+## 2026-10-28 — Proving the run: evidence the session did not write
+
+**Why.** The operator caught Claude saying it had checked their email when it had not.
+A second model reading that summary would have believed it too. Only evidence written
+by something other than the session can catch it.
+
+**Change.**
+- The desktop call ledger now records every session, not just check-ins.
+- `scripts/session_verify.py` checks a run's coverage claims against the ledger, cut
+  at a SessionStart marker the harness writes. Reading Gmail means opening messages.
+- An independent recount must cover every count a complete run claims.
+- Desktop sessions publish runs and findings to `ursula-board-feed.json` in Drive. The
+  claude.ai board reads it, labels the desktop's own verdict as self-reported, and
+  can recount Gmail and Calendar for any run window itself, with no model involved.
+
+**Observed.**
+- Before the fix, the desktop ledger had never existed. Git Bash rewrote the default
+  path to `C:/Program Files/Git/var/tmp`, which a normal user cannot write, and the
+  logging hook never blocks, so nothing reported it. `rails-check` now checks the real
+  location is writable.
+- After the fix, a live Slack call in this T3 session was recorded by the hook, and a
+  run claiming a Gmail read was rejected: "run claims Gmail read, but no such call is
+  recorded".
+- Real responses for the board's four new connector calls were observed before
+  publishing: Drive list, Drive read (contents come back already parsed), Gmail list
+  (an empty result has no `messages` key) and Calendar list.
+- The gateway's Drive upload fails ("outside the current directory"). The feed is
+  written with Google's own Drive connector.
+- The live ledger guard denied this maintainer's own edits whenever they named the
+  ledger, including edits to the guard itself; the code now assembles those names.
+
+**Review.** LiteLLM `gpt-6-sol`, two rounds.
+- Round 1 found 8 problems:
+  1. The ledger can still be edited by the agent. Accepted as a limit, guard narrowed,
+     documented.
+  2. The board showed the desktop's verdict as independent. Relabelled self-reported.
+  3. The recount was optional. Fixed.
+  4. The session chose its own cutoff. Fixed with the SessionStart marker.
+  5. Listing Gmail ids counted as reading. Fixed.
+  6. Coverage fields went unchecked. Fixed.
+  7. The check-in promise did not match the code. Docs narrowed.
+  8. Malformed recount pages counted as zero. Fixed.
+- Round 2 found 3 more, all fixed: a missing marker now fails; the verifier exemption is
+  pinned to the repo's own path; a Gmail read with no opens needs a zero recount.
+- A malformed count crashed the verifier until the tests caught it.
+
+**Not proven.**
+- Whether T3 fires SessionStart. `rails-check` warns until a marker appears; without
+  it every run verifies as failed.
+- The board changes have not run in claude.ai and need a full-set capability republish.
+- The recount worker has not run in a real session.
+- The ledger stops a session that claims a read it never made. It does not stop a
+  session set on deceiving: anything running as the operator can rewrite a local file.
+
+## 2026-11-04 — check-ins that never finish reading (live board, from the run log)
+
+Found by the operator noticing that notes and mail were sometimes not read. All 74
+check-in records (30 Sep to 3 Nov) were read; every run since 2 Nov 12:14Z was
+`partial` and the watermark had not moved for six runs.
+
+| # | Symptom | Fix |
+|---|---|---|
+| 14 | Long Gemini notes (an hour's meeting with transcript) exceed the tool reply limit; `read_file_content` errors, the run reads the saved overflow file, and the ledger counts no open. Five runs, 28 Oct to 2 Nov. | Read by plain-text export or tab by tab; `bin/ledger-log` marks an errored call with a body of 50,000 bytes or more as `oversize`, and the verifier counts it as opened because the content came back. |
+| 15 | Gmail listed about 60 per run and opened 8 to 10 "to save budget"; on 3 Nov 20:11 the close-out script allowed `complete` and the model recorded `partial` by hand. | Exclude automated senders in the query (`config/checkins.gmail_exclude`) and open every result; the verifier refuses `complete` when `gmail_opened < gmail_listed`. |
+| 16 | One unreadable source held the whole window: six partial runs on one watermark, each window larger than the last. | `carried_sources`: a partial run that names every gap by id may advance; carried items become `pending_sources`, read first next time, and become a finding after three carries. |
+| 17 | `always-on.md` said to list notes "modified in the window", contradicting `mining.md` (`createdTime`); 1 Oct re-listed 29 Sep notes. A document created at meeting start and shared at the end can fall between windows. | `createdTime` with a 24-hour lookback, de-duplicated against `state/checkin.read_sources`, plus attachments on events that ended in the window. |
+| 18 | `docs_get` returned only the Notes tab; a 2 Nov run reported "no summary produced" and never opened the transcript. | Read the transcript tab when the Notes tab has no summary. |
+
+Not yet proven in claude.ai: that `gws_drive_files_export` with `text/plain` fits in one
+reply for the longest documents; that the PostToolUse body of an oversize read is the
+content rather than a short error; that `after:`/`before:` with epoch seconds is honoured
+by both Gmail tools. First thing to read after the next check-in: `coverage`,
+`carried_sources` and whether `state/checkin.watermark` moved.
+
+Review, 2026-11-04: Mirantis LiteLLM (default reviewer model), one round on the frozen diff.
+Two "high" findings rejected after checking the code: the `state_checkin` condition is not
+inverted (`not carry_ok(run)` is true only for an empty error list), and partial runs do
+get the ledger-backed claim checks (`status in ("complete", "partial")`). One accepted:
+`opened_ids` was undocumented; it is now in `config/schema.md`, and only matters without
+`--ledger`. Local checks re-run by the lead: all six test files pass (17 new tests),
+`bin/install.sh --check` passes.
+
+## 2026-11-04 — repository baseline audit
+
+Audited commit `6d11f5a`; observations recorded at 2026-11-04T22:10:21Z.
+This was a repository audit, not a cadence or live acceptance run. No connector
+calls, board publication or runtime fixes were performed. Existing untracked
+`.DS_Store` was left untouched.
+
+**Executed:** `bin/install.sh --target all --check` passed; Python unittest
+discovery passed all 68 tests. The entrypoint is 359 lines. These checks validate
+local helpers and packaging constraints, not the cadence or host integration.
+
+**Open findings (not fixed):**
+
+1. **High — check-in evidence is not scoped to the current run.**
+   `scripts/checkin_verify.py:220` calls `ledger_facts(ledger)` without a cutoff;
+   `scripts/checkin_close.py` also reports facts from the entire ledger. A local
+   fixture with every call dated 1 October passed verification for the existing
+   2 November complete-run fixture with no errors. Old reads and finding writes
+   can therefore back a new run and permit watermark advancement. Bind evidence
+   to the harness-recorded session/run before verifying or reporting it.
+2. **High — repeated Gmail calls count as different messages read.**
+   `scripts/checkin_verify.py:91` counts calls, although distinct IDs are also
+   collected. A fixture claiming two listed and two opened messages passed with
+   two reads of `m1` and only one distinct message ID. Compare actual distinct
+   message coverage, with explicit thread-read semantics, before treating the
+   unread gap as closed. The shared ledger fact also feeds session verification.
+3. **High — sandbox calendar proposals can reach a real write.**
+   `artifact/index.html:1344` blocks dry-run and mode mismatches but permits an
+   item and current mode both set to sandbox. Evaluating the actual `whyNot`
+   function locally for a calendar-block proposal returned null (unblocked).
+   Its send branch at line 1335 inserts on the primary calendar after approval,
+   contrary to SKILL.md's sandbox rule that calendar changes remain proposals.
+   Enforce sandbox restrictions in both the approval and dispatch paths; also
+   check Jira outbox target routing against the sandbox project.
+
+The reproductions used temporary input records and the board's pure gate function;
+they did not mock connector responses or establish any live behavior. Independent
+model review remains pending; no external reviewer was invoked and no provider
+account authorization was inferred from this checkout's location.
+
+**Acceptance still outstanding in the recorded history:** cold installation end
+to end, the latest board changes in claude.ai, a real independent recount, and the
+4 November long-document/carry-forward changes in a live check-in. Documentation
+also needs a status refresh: README still calls the project early, CLAUDE.md's
+current-state section describes the September batch, and docs/release.md says
+`--target all` builds two bundles although the installer now builds three.
+
+### 5 Nov: the three findings fixed (local checks only, no claude.ai run)
+
+1. **Evidence scoped to the run.** `ledger_facts(..., this_session=True)` counts only
+   calls from the session of the latest `session_start` marker, from that marker on.
+   `checkin_verify.py` and `checkin_close.py` both use it. A ledger with no marker
+   fails. Writing the tests turned up a second defect: two sessions starting in the same
+   second resolved to the older one. Ties now go to the later line.
+2. **Gmail counted by distinct id.** `gmail_opened` is the number of distinct message or
+   thread ids read. Reads with no recorded id (`gws_gmail_read`) count as none.
+   `bin/ledger-log` now keeps `messageId` and `threadId`. This also tightens
+   `session_verify.py`, which shares the fact.
+3. **Sandbox gate.** `whyNot` refuses a sandbox `calendar_block`, and a sandbox
+   `jira_comment` outside `config/run.sandbox_project`. `send()` re-runs the gate before
+   any write. The audit's note on Jira routing in sandbox is covered by the second rule.
+
+**Executed by the lead:** `python3 -m unittest discover -s test` passed 73 tests (5 new,
+one per reproduction plus the tie and the missing-marker cases).
+`bin/install.sh --target all --check` passed. The board's real `whyNot` was evaluated
+in node for seven cases: sandbox calendar, sandbox Jira inside and outside the project,
+sandbox with no project set, live calendar, live Jira, and dry-run. Only the expected
+cases came back unblocked. `node --check` passes on the board's inline script.
+
+**Not yet observed:** the republished board in claude.ai, and a live check-in under
+the session scoping. One risk: on a host whose SessionStart hook does not fire,
+check-ins that verified before will now come back partial. `bin/rails-check` reports
+whether the marker is being recorded.
+
+**Review (Mirantis LiteLLM, default model, one round; `.handoffs/20261105-123022-litellm/`).**
+It raised five defects. Four were rebutted against the code: the config race (`runMode`
+and `sandboxProject` are set in one snapshot callback, and `runMode` stays null until
+then), "`str()` undefined" (it is at `artifact/index.html:742`), `since` being
+overridden (only the later cutoff is kept, so a caller can narrow the window, not widen
+it), and unknown Gmail tools (already excluded by tool name). One gap was accepted:
+nothing showed `bin/ledger-log` actually writes the ids. A new test now feeds six real
+hook events through `bin/ledger-log` and gets three distinct ids. The suite is 74 tests,
+all passing. No second round was needed.
+
+### 5 Nov: PR #2 review comments (Codex connector), all three confirmed and fixed
+
+Each was reproduced against `d67ba83` before it was fixed:
+
+1. **A failed run closed as "Nothing needs you."** A consistent `status: failed` record
+   verified with no errors. Close-out only flagged `partial`, so its final line read as
+   all clear and `status_allowed` relabelled the run as `partial`. Now the final line
+   says "failed, will retry", `status_allowed` is `failed`, and an exception from the
+   verifier ends in a partial line instead of no output.
+2. **A count written as text crashed the verifier.** `gmail_opened: "1"` raised
+   `TypeError`. Every coverage count, plus `findings_carried` and `findings_resolved`,
+   is now validated as a non-negative integer, reported if it isn't, and treated as
+   missing.
+3. **silent-green used today's open findings.** A clean run on 1 Oct was flagged for a
+   finding first seen on 1 Nov. `audit_trend.py` now rebuilds the open set for each run's
+   date from `first_seen` and `closed_at`/`last_seen`.
+
+Also: `re.split` takes `maxsplit` by keyword (Python 3.14 deprecation warning).
+`python3 -m unittest discover -s test`: 79 tests pass (5 new, including a new
+`test/test_audit_trend.py`).
+Review: Mirantis LiteLLM, one round (`.handoffs/20261105-141355-litellm/`). No defects.
+It noted that nothing tests the verifier-exception fallback in `checkin_close.py`
+directly. That path is hard to reach now that counts are validated, and it remains untested.

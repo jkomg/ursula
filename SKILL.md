@@ -31,6 +31,20 @@ answer), and how to publish the board there. Read it before setup or a cadence, 
 follow it wherever this file says "read the state store" or "update the board".
 Host differences belong in that file, not here: one cadence, one set of checks.
 
+## Organization and agent source
+
+Before reading private project data, follow `reference/organization-profiles.md`.
+Ask which profiles to configure (Mirantis, IREN, personal or custom), bind each
+project to one, and verify approved accounts and connectors. Recognize explicit
+user chat requests such as `Ursula --profile iren --agent codex`; they request a
+verified route, not a login change. A cross-organization switch requires a clean
+chat/project with no transfer of prior context. Missing policy means setup-only.
+
+Where the host can start sub-agents, the primary sends bulk reads to read-only
+workers and keeps reconcile, analysis, approvals and writes for itself. It saves
+`state/handoff` so another approved primary can take over mid-run. Read
+`reference/delegation.md` before a cadence and whenever you resume someone else's run.
+
 ## Mode
 
 Read `config/run.mode` before doing anything that writes.
@@ -78,11 +92,16 @@ instance changes a meeting the other organises.
 
 ## Before anything else
 
+0. **Verify organization.** Read the project policy and profile context; recheck
+   accounts and allowed agent sources per `reference/organization-profiles.md`.
+   State the organization and actual agent alongside run mode.
 1. **Load config.** Read `config/*` from the state store. No config means this is
    a first run — go to
    `docs/setup.md`, do the interview, and satisfy its **completion contract** before
    anything else. Never guess project keys or cadence.
    If `config/run.status` is `incomplete`, say what is missing and fix that first.
+   If `config/run.home` names another host, this store is retired: stop and say
+   where Ursula now lives (`docs/setup.md`, "Moving hosts").
 2. **Confirm connectors.** Jira, Google Drive, Gmail and Calendar must be readable,
    along with Slack for the full cadence. Prove each with a read, not by the name of
    a connector. If Jira is missing, stop and say so — see `docs/troubleshooting.md`,
@@ -123,6 +142,9 @@ match each to a notes source, and report the ones with no source by name. Measur
 automated mining found the origin of one ticket in six — the rest came from meetings
 that produced no reachable notes at all. The unmatched list is what Pass 0 is for, and
 a mining pass reported without it is a false clean bill of health.
+
+Before reconciliation, capture source receipts following `reference/source-receipts.md`.
+Do not reconstruct evidence from memory. Missing capture is a partial run.
 
 ### Pass 2 — reconcile
 
@@ -180,6 +202,14 @@ Apply the accepted tags — the label plus the current week tag — and write th
 and priorities agreed in the same pass.
 
 ### Pass 5 — write back
+
+Run the receipt gate in `reference/source-receipts.md` before any external write.
+A failed or unavailable gate blocks write-back and watermark advancement. Then run the
+antagonist pass (`reference/delegation.md`): actions it objects to wait for the operator;
+if it cannot run, write anyway and record it as pending. Before the run record is final,
+prove it (`reference/delegation.md`, "Proving the run"): the call ledger and an
+independent recount. A failed check makes the run unverified, and the final line says so.
+
 
 In `dry-run`, emit the changeset and stop: no Jira or Calendar writes and no
 one-pager staging comment. The run log and findings below are still written — they
@@ -297,7 +327,9 @@ own board.
 | `docs/routine.md` | Turning check-ins on, and the routine's prompt. |
 | `reference/runtime.md` | Before setup or a cadence. Host tools, state and board adapter. |
 | `reference/run-recovery.md` | Every mine and write batch. Bounded windows and partial-run recovery. |
+| `reference/delegation.md` | Every cadence, and on taking over a run. Workers, handoff, reviewer fallback. |
 | `docs/chatgpt.md` | Installing or setting up in ChatGPT/Codex. |
+| `docs/desktop.md` | Running in T3, Claude Code or Codex on the operator's machine, with the hooks and LiteLLM. |
 | `docs/setup.md` | First run, or onboarding a new operator. |
 | `docs/sandbox.md` | Before the first run anywhere. Modes, prohibitions, how to test. |
 | `test/golden-week.md` | Regression fixture — a week processed by hand. |

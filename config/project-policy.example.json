@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "organization": "personal",
+  "allowed_agents": [
+    "codex",
+    "claude-code",
+    "ollama"
+  ],
+  "default_agent": "codex",
+  "review_agent": "claude-code",
+  "allow_mirantis_litellm": false,
+  "profile": "personal"
+}

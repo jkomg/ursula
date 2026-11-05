@@ -22,7 +22,13 @@ Monday and Thursday, where the operator is present to decide.
 3. **Read `state/checkin`.** It holds this routine's own watermark and the last Slack
    message it read. It is separate from `state/watermark`, which only the Monday and
    Thursday sessions advance.
-4. **Freeze the window**: from `state/checkin.watermark` to now.
+4. **Freeze the window**: from `state/checkin.watermark` to now. Copy
+   `state/checkin.pending_sources` into the run's `pending_in`; those are read first.
+5. **Check the routine itself ran.** The check-ins are scheduled
+   (`config/checkins.schedule`). List the last day's `runs` with `session: checkin`; if a
+   scheduled slot has no record (the routine did not fire, or died before writing), say
+   so in `could_not` and the final line. Nothing else notices a check-in that never
+   happened.
 
 ## The passes
 
@@ -56,6 +62,77 @@ needs: new meeting-notes documents, direct commitments by email, calendar change
 today and the next working day. Reconcile against Jira before proposing anything; a
 check-in that proposes a ticket that already exists is noise.
 
+**Coverage is part of success.** Three sources are required every check-in, and a
+check-in that did not read all of them is `partial`, however clean the rest looks. The
+operator's Slack DM (pass 1) is the third: it is read every run when
+`config/checkins.slack_dm` is set, and a run that did not use the Slack connector says
+so as a skipped source. The other two:
+
+1. **Drive notes.** Take the window's notes documents from two places and merge them by
+   file id: the attachments on calendar events that **ended** in the window, and a Drive
+   search on `createdTime` (never `modifiedTime`; see `reference/mining.md`) that starts
+   **24 hours before** `state/checkin.watermark`. Drop any id already in
+   `state/checkin.read_sources`; what is left is `drive_docs_in_window`. The lookback
+   exists because a notes document is created when the meeting starts but reaches the
+   operator only when it is shared afterwards, often after the check-in that covered
+   the meeting has closed its window. Without the lookback that document is never
+   in any window. Open each one, take its action items and reconcile them against
+   Jira. A title seen in a listing is not a read. An empty template is read and
+   reported as empty.
+
+   **Long notes do not fit in one tool reply.** A Gemini document for an hour-long
+   meeting, with its transcript tab, runs past 90,000 characters and
+   `read_file_content` fails with a size error (five check-ins, 28 Oct to 2 Nov). Do
+   not fall back to reading the harness's saved output and recording it as unread.
+   Read it in a form that fits: export it as plain text (`gws_drive_files_export`,
+   `mimeType: text/plain`), or read it tab by tab with `gws_docs_documents_get`
+   (`includeTabsContent: true`). The **Notes** tab carries the summary and next
+   steps; read the transcript tab only when the notes tab says no summary was
+   produced (2 Nov: a run read the notes tab, found "no summary", and never opened the
+   transcript). An oversize read that did return the content is counted as opened by
+   the ledger; one that returned only an error is not.
+2. **Gmail.** Keep automated mail out of the query instead of trying to triage it, so
+   the messages that remain are few enough to open every one. Search with
+   `after:<window start as epoch seconds> before:<window end as epoch seconds>` (not
+   `newer_than`, which has day granularity, and not a date, which Gmail does not read
+   as UTC) and add `-from:` for each sender in `config/checkins.gmail_exclude`,
+   plus `-category:promotions -category:social`. Page with `nextPageToken` until the
+   window is covered. Then **open every message the query returned**, at least with
+   `format: metadata`, and read in full anything from a person addressed to the
+   operator. `gmail_listed` is the count the query returned and `gmail_opened` the
+   count opened; a complete run has the two equal. Close-out counts opened messages by
+   distinct id from `messages_get` (or `threads_get`, once per thread), so open each
+   message by its id: reading the same message twice counts once, and `gws_gmail_read`,
+   whose id the ledger does not keep, counts as none. A list of ids is not a read, and
+   neither is a sample: runs on 3 Nov listed about 60 messages, opened 8 to 10 "to save
+   budget", and were still recorded as having read mail. If the exclusion list leaves
+   more than 40 messages, it is missing a noisy sender: open them all anyway this run,
+   and propose the sender for the list in the final line.
+
+   If `google_gmail_messages_list` answers 502 once, switch to
+   `gws_gmail_users_messages_list` for the rest of the run rather than retrying (four
+   runs saw the 502; on 16 Oct the other tool also ignored its `after:` filter and
+   returned the same 24 messages for every window, so check that the dates returned
+   fall inside the window).
+
+The first defect: a check-in listed two new notes by title, skipped Gmail, recorded
+`complete` and advanced the watermark, so the next window would never have contained
+them. The one-line summary said "nothing needs you".
+
+**Carry what could not be read; do not hold the whole window.** A run that read
+everything except one document or a handful of messages names each one, by id, in
+`carried_sources` (`{kind: "drive"|"gmail", id, title, reason, carry_count}`). The
+run is still `partial` and says so in the final line, but the watermark may advance,
+and the carried items become `state/checkin.pending_sources`, which the next check-in
+reads **first**, before anything new. Without this, one unreadable document kept the
+watermark at 2 Nov 12:14Z for six runs; each window grew, and each run had more to
+read and was more likely to fall short. The verifier allows the move only when every
+gap is accounted for: the Drive gap equals the carried documents, the Gmail gap equals
+the carried messages, the notes and DM passes ran, and no connector failed outright (a
+403, a 502 with no working fallback, a timeout). A source that has been carried three
+times is not carried a fourth: raise it as a finding, `unreadable-source-<id>`, so
+the operator hears about it.
+
 ### 3. The quick checks
 
 Run only the checks that cannot wait for the next cadence:
@@ -68,7 +145,49 @@ Run only the checks that cannot wait for the next cadence:
 Each one that fires becomes a finding (`findings/<key>`) with a recommendation, exactly
 as in `reference/analysis-checks.md`. The full set runs on Monday and Thursday.
 
+**Re-evaluate every open finding first, before looking for new ones.** A new day's
+check-in starts from the board, not from an empty page. A morning run read the calendar,
+wrote "no collisions today" and "nothing due today" and carried none of four open
+findings, one of which was a collision at 11:30 that same morning and another a review
+due close of business. So, on every check-in:
+
+1. List `findings` whose `status` is `open` or `carried`. This is the **open set**; its
+   size goes in the run record.
+2. For each one, re-test its evidence against the clock and a fresh read: is the
+   calendar overlap still there, is the item still unmoved, has the thread been
+   answered, has the ticket changed? Then set `status` (`carried`, or `resolved` with
+   `closed_by: "session"` and a `close_note` saying what you observed), update
+   `last_seen`, and add a line to `evidence_note` with the time you re-read it.
+3. A finding whose time is **today or the next working day** (a collision, a due date,
+   a "by close of business") is **imminent**. Imminent findings cannot be dropped from
+   the final line at any voice level, and a check that reports `calendar-collision-today`
+   or `due-today-or-tomorrow` as clean while an imminent finding of that check is open
+   is wrong by construction.
+4. Never close a finding because it fell out of the window. A finding closes when its
+   cause is gone, or the operator closes it. A cause that is plainly gone is closed by
+   the check-in, not left open: a collision whose event has passed is `lapsed` (not `resolved`: nobody fixed it, and
+   the audit counts these) with `close_note: "event passed <date>"`; set `due_at` when
+   you raise a finding so imminence can be computed rather than judged; a due-date finding whose ticket is now Done, or
+   whose due date moved, is `resolved` with what you saw. Fifteen collision and
+   due-date findings from weeks 40 to 43 were still `open` on 27 Oct, which made the
+   open set noise and hid the two that mattered.
+
+**Time zones.** Calendar events carry an offset and sometimes a separate `timeZone`
+that disagrees with it (an organiser in Central time, an offset in Eastern). Convert
+every start and end to the operator's zone (`config/cadence` `tz`) from the offset, and
+compare instants, not clock faces. When the two disagree and the overlap depends on
+which is right, raise it as a rank-3 finding that says so; do not leave it as a note
+in `could_not`.
+
 ### 4. Stage and propose
+
+Draft the findings and outbox items first, then run the antagonist pass over the drafts
+(`reference/delegation.md`) **before writing any of them**, so an objection arrives in
+time. An outbox item it objects to is not written; it goes in the final line with the
+objection, for the operator to decide. A finding it objects to is written with the
+objection attached, because findings are the operator's own record. In a claude.ai
+routine the antagonist cannot run today: record `antagonist.status: "pending"` and
+write as normal.
 
 - Findings: write them. Stage their one-pager comment as a proposal, as on any day.
 - Anything that should happen: an outbox item (`reference/outbox.md`) with the exact
@@ -106,6 +225,14 @@ the operator, by level:
 A connector that failed for a reason only the operator can fix goes in the final line
 at every level ("Reconnect Atlassian in claude.ai settings: Jira refused every call").
 
+**A `partial` run says so in the final line at every level, including `quiet`**, naming
+what was not read: "Ursula: partial, Gmail and 2 Drive notes not read, will retry".
+`Nothing needs you.` is only for a `complete` run with **no imminent finding and no stale
+outbox item**. An imminent finding is always named, at every level: "Ursula: 11:30
+collision today, VA MOSAIC review due COB". Silence that hides a gap is the
+failure this skill exists to prevent. "Read 0 notes" is ambiguous; say "0 new board
+notes" and name what else was read.
+
 The board is the record at every level: the Outbox tab and Findings hold the detail
 the line points to.
 
@@ -119,14 +246,69 @@ connector write, which is the right default.
 
 - `runs/<date>-checkin-<HHMM>` with `session: checkin` and the usual fields; `created`
   and `edited` are 0 because a check-in writes to Jira only through the outbox
-- `state/checkin`: `watermark` to the frozen window end and `slack_last_ts` to the
-  newest operator message read, **only if the check-in completed**
+- `coverage`: `{notes_read, slack_dm_read, drive_docs_opened, drive_docs_in_window,
+  gmail_listed, gmail_opened, gmail_read, open_set, open_set_evaluated, outbox_stale}`,
+  the counts
+  and booleans behind the rules above, so that completeness can be checked rather than
+  claimed. `scripts/checkin_verify.py` reads this and the findings and refuses a record
+  that says `complete` without them; run it on the record before writing it (see
+  "Close-out" below)
+- Outbox: list items with status `proposed` whose `expires_at` has passed, count them in
+  `coverage.outbox_stale` and name them in the summary. The board will not send them;
+  only the operator can re-approve or reject, so a stale item is a thing the operator
+  needs to hear about once, not an item to leave untouched and unmentioned
+- `status`: `complete` only if the coverage rule above was met (every Drive notes
+  document opened, every Gmail message the query returned opened) and no required
+  connector failed. Otherwise `partial`, with
+  each unread source named in `could_not`. Never write `complete` on a run whose
+  `could_not` lists a skipped required source
+- `state/checkin`: `watermark`, `slack_last_ts` and `pending_sources` **only as
+  `checkin_close.py` prints them** (`pending_sources` is this run's `carried_sources`).
+  Separately, on every run, partial or not, add the ids of documents and messages
+  opened this run to `read_sources` (`{id: opened_at}`, dropping entries older than 14
+  days), which is what keeps the 24-hour lookback from reading a document twice. The
+  script prints a new state for a `complete`
+  run, and for a `partial` run whose every gap is carried (see "Carry what could not
+  be read"). Any other `partial` run leaves `state/checkin` where it was, so the next
+  check-in re-reads the same window; reconciliation skips what already exists
+- `pending_in`: the `state/checkin.pending_sources` this run started with. Each one is
+  either opened this run or carried again with `carry_count` one higher; the verifier
+  refuses a run that drops one silently
 - `could_not`: every connector that failed, every source it could not open. A check-in
   that quietly skipped Jira looks exactly like one that found nothing
 - A connector that failed for a reason only the operator can fix belongs in the final
   line: Jira answering 403 "The app is not installed on this instance" means the
   claude.ai Atlassian connection has lapsed, and the fix is to reconnect it in
   claude.ai Settings → Connectors
+
+### Close-out
+
+The run record is the model's own account. Close-out checks it against evidence the model
+did not write: `bin/ledger-log`, a hook on the routine, appends every connector and board
+call to a hash-chained ledger with the harness's clock (`docs/governance.md`).
+
+1. Write the run record as `status: "complete"` or `"partial"` honestly, with `coverage`
+   (now including `gmail_opened`), to a scratch file. Export the open findings with
+   ArtifactData `out_dir`, and the outbox if `outbox_stale` or needs-OK counts matter.
+2. Run `python3 scripts/checkin_close.py RUN.json FINDINGS_DIR --level <config/voice.level> --slack-dm <config/checkins.slack_dm>`. (The ledger is
+   found from `URSULA_LEDGER`, default `/var/tmp/ursula-ledger/ledger.jsonl`; do not read
+   or write that file directly, the guard denies it.) It verifies the record against the open findings and
+   the ledger, counting only calls from this session (the latest `session_start` marker
+   the SessionStart hook wrote, and calls with its session id from then on; a ledger with
+   no marker fails, and so does a run whose reads were made by another session), and prints `status_allowed`, `final_line`, `state_checkin` and a `ledger`
+   summary.
+3. Write `status` as `status_allowed`, store `verified: {ok, errors}` and the `ledger`
+   summary (including `head`) on the run record, and move `state/checkin` **only to the
+   `state_checkin` it printed**, which exists only when verification passed and the run
+   was complete or carried every gap.
+4. The final message is `final_line`, verbatim. Do not rewrite it, shorten it or
+   substitute "Nothing needs you." The script has already put `partial` first, then
+   imminent findings, then outbox items.
+
+If the script cannot run (no Python, no ledger because the hooks are not on this
+environment), the run is `partial`, says so in `could_not` and the final line, and moves
+nothing. A check-in that finds the ledger empty has not been observed; it must not
+present itself as verified.
 
 ## Untrusted input
 
@@ -147,3 +329,16 @@ It read two new notes documents and one DM reply, skipped three candidates that 
 had tickets, raised one finding (a collision tomorrow at 10), proposed one focus block
 and one email reply, and at `quiet` ended with the line the operator's phone showed: "Ursula: 1 finding,
 2 things need your OK". Total time, a few minutes.
+
+## Receipt gate for check-ins
+
+Apply `reference/source-receipts.md` to each check-in as well as weekly passes.
+Freeze the actual reads with a unique run ID and explicit coverage. Validate the
+proposal receipts immediately before external writes or watermark advancement.
+A failed or unavailable gate blocks those actions. Preserve dry-run and approval
+rules. Incomplete coverage is never a successful completed cadence. An antagonist
+pass that could not run is recorded as `antagonist.status: "pending"`, named in the
+final line, and does not by itself make the run partial or hold the watermark: the
+operator chose this (2026-10-28) so that hosts with no antagonist route still
+advance. Antagonist findings left unresolved do keep the run partial. The board's independent UI is not intercepted by
+this command-line check.

@@ -16,7 +16,9 @@ Setup is a conversation.
 setup completion contract passes, then `complete`. Record missing setup checks
 alongside status. `sandbox_project` is required in sandbox. `prohibitions` records
 the hard limits in `SKILL.md`; `calendar` may restrict the allowed approval tiers.
-Missing mode is dry-run, never implicit permission to write.
+Missing mode is dry-run, never implicit permission to write. `home`, when set to a
+host other than the current one, marks this store retired after a move (`docs/setup.md`,
+"Moving hosts"); a session reading it stops.
 
 ### `config/jira`
 
@@ -84,6 +86,7 @@ only sets the starting value. It is the one config document the board may change
 | `routine` | The routine's claude.ai link, so the operator can find it to pause it |
 | `schedule` | Human-readable, e.g. "weekdays 8am, noon, 4pm ET" |
 | `slack_dm` | The channel id of the operator's DM with themselves (a `D…` id) |
+| `gmail_exclude` | Sender addresses or domains left out of the check-in Gmail query (`-from:` each), e.g. `jira@<site>.atlassian.net`, `calendar-notification@google.com`, `drive-shares-dm-noreply@google.com`. Seeded at setup from last week's mail; never includes `gemini-notes@google.com`. Without it a check-in cannot open every message and stays `partial` |
 
 ## State
 
@@ -94,7 +97,7 @@ Operational, not configuration. Same database, `state` collection.
 | `state/watermark` | Timestamp of last successful mine. Only updated on success. |
 | `state/ingested` | Source document id to created issue keys. Prevents re-ingestion. |
 | `state/tagging` | Proposals and whether the operator accepted them. |
-| `state/checkin` | `watermark` (the check-ins' own, never the cadence's) and `slack_last_ts` (newest operator DM message read). Advanced only by a completed check-in. |
+| `state/checkin` | `watermark` (the check-ins' own, never the cadence's), `slack_last_ts` (newest operator DM message read), `pending_sources` (sources a previous run could not read, `[{kind, id, title, reason, carry_count}]`, read first next time) and `read_sources` (`{id: opened_at}` for 14 days, so the Drive lookback does not re-read). The first three move only to the `state_checkin` that `scripts/checkin_close.py` prints: on a complete run, or a partial run that carried every gap. `read_sources` is added to on every run. |
 
 ### `notes/<id>`
 
@@ -135,7 +138,8 @@ hyphens, no accents.
 | `check` | Check slug, e.g. `deadline-inversion` |
 | `pack` | `core`, or the pack name |
 | `title` | One line, readable cold |
-| `status` | `open` · `carried` (open and seen again this run) · `resolved` · `dismissed` |
+| `status` | `open` · `carried` (open and seen again this run) · `resolved` (the cause was dealt with or is gone) · `lapsed` (its time passed and nobody acted; stays visible and is counted by the audit) · `dismissed` |
+| `due_at` | Optional ISO datetime with offset: when the finding bites (a meeting start, a due date, a close of business). `scripts/checkin_close.py` treats an open finding as imminent when this is past or within 36 hours; without it a finding is never named in the final line |
 | `rank` | Order by consequence this run; 1 is the most serious. The board sorts on it |
 | `first_seen`, `last_seen` | ISO dates |
 | `evidence`, `consequence`, `recommendation` | Plain text. A finding without a recommendation is unfinished |
@@ -162,21 +166,61 @@ check-in. The board shows the latest 52 sessions and folds check-ins under the d
 | `session` | `plan` · `retro` · `adhoc` · `hire-scan` · `checkin` |
 | `time` | Check-ins only: local `HH:MM` the check-in ran, read from the clock |
 | `mode` | `dry-run` · `sandbox` · `live` |
-| `status` | `complete` · `partial` · `failed`. Only `complete` advances the watermark |
+| `status` | `complete` · `partial` · `failed`. Only `complete` advances the cadence watermark. A check-in that is `partial` may advance its own watermark when every unread source is in `carried_sources` |
+| `carried_sources`, `pending_in` | Check-ins: sources not read this run, and the pending sources it started with, each `{kind: "drive"\|"gmail", id, title, reason, carry_count}`. Checked by `scripts/checkin_verify.py` |
+| `opened_ids` | Check-ins: ids of documents and messages opened this run. Used by `scripts/checkin_verify.py` only when it runs without `--ledger`, which proves nothing; `checkin_close.py` always passes the ledger, and there a pending source counts as opened only if the ledger shows the read |
 | `summary` | One or two sentences |
 | `watermark_before`, `watermark_after` | Timestamps; after remains before on a partial/failed run |
 | `window_start`, `window_end` | Frozen UTC mining bounds; only a successful run advances to window_end |
 | `sources` | `{found, expected, unmatched_meetings: [names]}` — `expected` is the prediction stated before mining |
+| `coverage` | Every session that mined. Check-ins: `{notes_read, slack_dm_read (null if no DM configured), drive_docs_opened, drive_docs_in_window, gmail_listed, gmail_opened, gmail_read, open_set, open_set_evaluated, outbox_stale}`, refused as `complete` by `scripts/checkin_verify.py` without them. Other sessions add `calendar_read`, `jira_read` and `calendar_events`, and are checked by `scripts/session_verify.py`. Counts are what the session saw in the window, not what it guessed |
+| `verified` | `{ok, errors, ledger_calls, ledger_head, since, recount}` from the verifier. `ok: false` means the run is not `complete`. `ok: null` with `reason` where no ledger can exist |
+| `verified`, `ledger` | `{ok, errors}` and `{calls, errors, head, first, last, by_tool}` from `scripts/checkin_close.py`. A check-in run without `verified.ok` is unverified, and `scripts/audit_trend.py` counts it |
+| `findings_resolved` | Check-ins: open findings closed this run by `session` |
 | `created`, `skipped`, `edited` | Counts from reconcile and write-back |
 | `tags_proposed`, `tags_accepted` | Counts from the tagging sweep |
 | `findings_new`, `findings_carried` | Counts |
 | `checks_clean` | Slugs of checks that ran and found nothing |
+| `antagonist` | `{status: ran · pending, reviewer, model, reason, findings, held}`: the routine antagonist pass (`reference/delegation.md`). `model` is the one actually returned; `held` lists action ids kept back for the operator |
 | `could_not` | What could not be done, one line each. `[]` when nothing, never omitted |
 
 The four things every run must end with (`SKILL.md`, "What good looks like") map to
 `sources.unmatched_meetings`, `skipped`, the `findings` collection and `could_not`. The
 board marks a run that left any of them out as *not recorded*, so a tidy-looking entry
 with no coverage list reads as incomplete rather than clean.
+
+### Board feed
+
+A desktop host publishes its runs to the claude.ai board through one JSON file in the
+operator's Google Drive, named `ursula-board-feed.json`. It is replaced after each
+session. The board finds it by that name among files the operator owns.
+
+```json
+{"feed_version": 1, "generated_at": "ISO", "organization": "mirantis", "profile": "mirantis",
+ "runs": {"<run id>": {"...": "the runs/<id> document, including coverage and verified"}},
+ "findings": {"<key>": {"...": "the findings/<key> document"}},
+ "hires": {"<slug>": {"...": "the hires/<slug> document"}}}
+```
+
+It carries the shapes above, never config, credentials, receipts' source text or
+another organization's data. The board treats it as untrusted input, the same as an
+export (`scripts/render_snapshot.py`). It is a copy for display: the desktop store
+stays the master, and nothing the board does writes back to it.
+
+### `state/handoff`
+
+Written by the primary after each pass, around each write and when it stops to ask
+(`reference/delegation.md`). One document, replaced each time.
+
+```json
+{"run_id": "2026-11-02-plan", "holder": {"agent": "claude-code", "model": "...",
+ "since": "ISO"}, "pass": "pass-3-analyse", "window": {"start": "ISO", "end": "ISO"},
+ "changeset": "changesets/<run-id> or null", "open_questions": ["..."],
+ "next": "one sentence", "updated_at": "ISO"}
+```
+
+A pointer into other records, never a copy of findings or receipts. A new primary
+reads it before anything else; it does not prove the previous holder has stopped.
 
 ### `changesets/<run-id>`
 
@@ -234,3 +278,31 @@ each other.
 
 Config is per-operator. Two operators watching the same boards have two separate
 configs and two separate databases. Jira is the only shared state.
+
+## Source provenance
+
+New actionable items, findings and proposed changes require `source_receipts` with
+`source_type`, `source_id`, `sha256` and nonempty `exact_quote`. See
+`reference/source-receipts.md` for the frozen input/proposal contract and gate.
+Store private source excerpts outside shared board rows; shared rows may link to
+receipts only when the audience is authorized to read the underlying source.
+
+## Organization context
+
+`config/profiles` is a private registry, outside bundles: profile name, organization
+slug, allowed agent sources, account/workspace verification observations (method
+and time), and state-store reference. Store no tokens/passwords. Each profile has
+its own separate store; `config/context` records organization, project binding and
+requested agent. See `reference/organization-profiles.md`. Existing state without
+context is unknown until the operator identifies it; do not silently migrate it.
+
+`config/profiles` also records, per agent source, the plan the operator named and,
+for a gateway, the explicit model and the model actually returned by the verification
+call. No endpoint keys.
+
+The shared project manifest uses the exact fields validated by
+`scripts/project_policy.py`. Version 2: version, profile, organization, allowed_agents,
+primary_order, review_order, allow_mirantis_litellm. Version 1 has default_agent and
+review_agent instead of the two orders. Run records include organization, actual
+provider/model and account verification method; never treat a requested agent as
+proof that it executed. Configuration flags do not grant permissions.

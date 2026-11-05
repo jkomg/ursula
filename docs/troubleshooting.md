@@ -44,6 +44,28 @@ a string. Parse twice — see `reference/jira-conventions.md`.
 Use `title`, not `name`. `title contains 'x'` matches word prefixes rather than
 strict substrings, so it is looser than it looks.
 
+## A notes document "exceeds the tool limit"
+
+Long Gemini documents (an hour's meeting with its transcript tab) run past 90,000
+characters and `read_file_content` fails. Export as plain text with
+`gws_drive_files_export` or read the tabs with `gws_docs_documents_get`; see
+`reference/mining.md`, "Long documents". Seen in five check-ins, 28 Oct to 2 Nov.
+
+## Check-ins stay partial and the watermark does not move
+
+Read the last runs' `could_not`. If the gap is unopened Gmail, the exclusion list
+(`config/checkins.gmail_exclude`) is missing a noisy sender. If it is one document,
+it should be in `carried_sources`, which lets the watermark move; a run that holds the
+whole window for one item is following the old rule. A source carried three times
+becomes an `unreadable-source-<id>` finding.
+
+## Gmail list returns 502, or the same messages for every window
+
+`google_gmail_messages_list` on the Mirantis gateway answers 502 intermittently. Switch
+to `gws_gmail_users_messages_list` for the rest of the run, and check that the dates
+returned fall inside the window: on 16 Oct an `after:` filter was ignored and every
+window returned the same 24 messages.
+
 ## Notes document with no meeting name
 
 Match to the calendar by timestamp, allowing a few minutes of drift. If nothing

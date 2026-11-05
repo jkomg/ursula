@@ -50,3 +50,10 @@ watermark or live ingested map. Sandbox calendar changes are proposals only.
 Only after all approved actions and required output/state saves succeed, record
 the run complete and advance to window_end as the **last** state write. If that
 final write fails, resume using the receipts instead of replaying external writes.
+
+## Receipt gate before completion
+
+Follow `reference/source-receipts.md` before each approved write batch. Retain the
+verification report with hashes of both frozen inputs and proposals. Edits require
+a fresh report. Missing evidence, failed verification or unresolved review findings
+keep the run partial and the watermark unchanged. This does not replace approvals.
