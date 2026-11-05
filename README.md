@@ -12,6 +12,78 @@ that an access grant does not do what someone thinks it does, or that a fix appl
 to three tickets left two templates broken. A run that produces tidy tickets and no
 findings has done the easy half, unless it shows per check what ran clean and why.
 
+## Install
+
+Download from the [latest release](https://github.com/jkomg/ursula/releases/latest).
+Each release has three zips, one per route below. Do not use GitHub's green **Code →
+Download ZIP** button: that zip is the whole repository, not an installable skill,
+and it carries no version, so the skill cannot tell you what it is running.
+
+### 1. claude.ai (the usual route)
+
+1. In claude.ai, turn on four connectors: **Atlassian**, **Custom Google Drive** (the
+   Mirantis gateway, which carries Gmail, Calendar and Docs), **Google Drive** (Google's
+   own, used to find meeting notes) and **Slack**. Both Google connectors are needed. If
+   Atlassian shows a *request* button rather than a toggle, an org owner has to enable it.
+2. Download `ursula-<version>.zip`. **Do not unzip it.** If your Mac unzipped it,
+   upload the original download.
+3. Settings → Capabilities → Skills → upload the zip. If Ursula is already installed,
+   replace it. Two copies trigger unpredictably.
+4. In a fresh chat, ask **"Which Ursula version is running?"** It should name the
+   release version. That is the only proof the upload took.
+5. Say **"Set up Ursula"** and answer the interview. It verifies each connector by
+   reading from it and creates your own board. You never edit a file.
+6. Mind the mode (see below).
+
+More detail: [`INSTALL.md`](INSTALL.md) and [`docs/setup.md`](docs/setup.md).
+
+### 2. On your own machine (T3 or Claude Code)
+
+The only route where the safety rails run: hooks, the call ledger and the LiteLLM
+reviewer. Use it in addition to claude.ai, or instead of it.
+
+1. Install Python 3.8 or newer. On Windows, install it from python.org or with
+   `winget install Python.Python.3.12` (the built-in `python3` is only a Store
+   shortcut), and install Git for Windows for `bash`.
+2. Download `ursula-desktop-<version>.zip` and **unzip it** into a work folder, for
+   example `Documents/ursula`. To update, unzip the newer one over the same folder:
+   your local settings and state are not in the zip, so they are kept.
+3. Open the folder in T3 or Claude Code. In T3, use **Claude as the provider**: under
+   Codex the hooks do not run, so check-ins always come back partial.
+4. Run `bash bin/rails-check`. Every line should say `ok`, apart from LiteLLM until
+   step 5. Stop on any `FAIL`.
+5. If you have a LiteLLM key, store it yourself with the command in
+   [`docs/desktop.md`](docs/desktop.md). Never paste it into a chat.
+6. Say **"Set up Ursula"**, or after an update, **"Ursula, check my setup after the
+   update"**.
+
+More detail: [`docs/desktop.md`](docs/desktop.md); Windows at Mirantis:
+[`docs/windows-mirantis.md`](docs/windows-mirantis.md).
+
+### 3. ChatGPT or Codex
+
+1. Make sure ChatGPT or Codex can reach Jira, Google Drive, Gmail, Calendar and
+   Slack. Your organisation may need to approve access.
+2. Download `ursula-openai-<version>.zip`. Unzip it only if your installer asks you
+   to; some accept the zip directly.
+3. Install it the way your ChatGPT desktop app or Codex takes skills. ChatGPT in a
+   browser or on a phone needs an organisation plugin that includes Ursula; this zip
+   is not that plugin.
+4. In a new chat say **"Set up Ursula in dry-run. Explain each step in plain
+   language."** If it is not recognised, pick it first: `@` in ChatGPT, `$ursula` in
+   Codex.
+
+There is no live board on this route: you get a dated snapshot and private state
+files. More detail: [`docs/chatgpt.md`](docs/chatgpt.md).
+
+### Mode, on every route
+
+You start in **dry-run**: Ursula reads everything real and sends nothing. Move to
+**live** after two cadences that looked right. In live, pressing **Approve** on the
+board really sends the email, Slack message, Jira comment or calendar block. **Sandbox**
+sends Jira writes only to a throwaway project and never touches the calendar, so set
+that project first ([`docs/sandbox.md`](docs/sandbox.md)).
+
 ## Layout
 
 ```
@@ -41,8 +113,10 @@ config/
 
 ## Start
 
-**Handing this to someone? Run `bin/install.sh --target all` and send the matching
-host zip with `INSTALL.md`.** Claude remains the default build target.
+**Handing this to someone?** Point them at the latest release and the Install
+section above. To cut a release, run `bin/install.sh --target all` on a clean
+checkout and attach the three zips from `dist/` to a release tagged
+`v<version>` (`docs/release.md`).
 
 ChatGPT/Codex installation and setup: `docs/chatgpt.md`. Both hosts use the same
 cadence and checks. Claude has a live artifact board; ChatGPT/Codex has a portable,
