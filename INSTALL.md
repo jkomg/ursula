@@ -49,7 +49,9 @@ there, and the config, state and board all live in a claude.ai artifact that Cla
 Code cannot reach. Claude Code is the right place to *edit* this repo; it is not where
 the skill runs.
 
-1. You were given `ursula-<version>.zip`. Do not unzip it.
+1. You were given `ursula-<version>.zip`, or downloaded it from the
+   [latest release](https://github.com/jkomg/ursula/releases/latest) (not the
+   `-openai` or `-desktop` one). Do not unzip it.
 2. In claude.ai: Settings → Capabilities → Skills → upload the zip. If an older Ursula
    is there, replace it rather than adding a second one — two copies of the skill
    trigger unpredictably.
