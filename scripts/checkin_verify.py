@@ -182,6 +182,20 @@ def verify(run, findings, ledger=None, slack_dm=None):
             errs.append(f"{k} is missing")
 
     cov = run.get("coverage")
+    # The record is model-written: a count may arrive as "1". Report it rather than crash
+    # on the comparisons below, and treat it as missing from here on (PR #2 review).
+    if isinstance(cov, dict):
+        cov = dict(cov)
+        for k in ("drive_docs_opened", "drive_docs_in_window", "gmail_listed", "gmail_opened",
+                  "outbox_stale", "open_set", "open_set_evaluated"):
+            if cov.get(k) is not None and (type(cov[k]) is not int or cov[k] < 0):
+                errs.append(f"coverage.{k} must be a non-negative integer, not {cov[k]!r}")
+                cov[k] = None
+    run = dict(run)
+    for k in ("findings_carried", "findings_resolved"):
+        if run.get(k) is not None and (type(run[k]) is not int or run[k] < 0):
+            errs.append(f"{k} must be a non-negative integer, not {run[k]!r}")
+            run[k] = None
     if status == "complete":
         if not isinstance(cov, dict):
             errs.append("complete run has no coverage block")
@@ -291,7 +305,7 @@ def verify(run, findings, ledger=None, slack_dm=None):
     # A check cannot be clean while an open finding of that check exists.
     open_checks = {f.get("check") for f in findings if f.get("check")}
     for clean in run.get("checks_clean") or []:
-        slug = re.split(r"[\s(:]", str(clean).strip(), 1)[0]
+        slug = re.split(r"[\s(:]", str(clean).strip(), maxsplit=1)[0]
         for c in open_checks:
             if slug == c or slug.startswith(c):
                 errs.append(f"checks_clean lists {slug!r} but an open {c!r} finding exists")

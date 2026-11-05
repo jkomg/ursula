@@ -58,7 +58,26 @@ def main(argv):
         print(f"WARNING: {len(every) - len(runs)} check-in records have no date and are not counted\n")
     finds = list(docs(args[1]))
     today = datetime.date.today().isoformat()
-    open_checks = {f.get("check") for f in finds if f.get("status") in ("open", "carried")}
+
+    def open_checks_on(day):
+        """The checks with a finding open on `day`, rebuilt from first_seen and the close.
+
+        Using today's open set marked old runs silent-green for findings raised after
+        them, and missed findings open then but resolved since (PR #2 review). A
+        finding with no first_seen is taken as open from the start; one closed on the
+        run's own day is not counted, since that run may have been the one to close it."""
+        out = set()
+        for f in finds:
+            start = str(f.get("first_seen") or "")[:10]
+            if f.get("status") in ("open", "carried"):
+                end = None
+            else:
+                end = str(f.get("closed_at") or f.get("last_seen") or "")[:10] or None
+                if end is None:
+                    continue   # closed, but when is unknown: cannot place it
+            if start <= day and (end is None or end > day):
+                out.add(f.get("check"))
+        return out
 
     rows = defaultdict(lambda: defaultdict(int))
     per_date = defaultdict(int)
@@ -72,8 +91,9 @@ def main(argv):
             w["no coverage"] += 1
         if not (r.get("verified") or {}).get("ok"):
             w["unverified"] += 1
+        open_checks = open_checks_on(str(r["date"])[:10]) if st == "complete" else set()
         for c in r.get("checks_clean") or []:
-            slug = re.split(r"[\s(:]", str(c).strip(), 1)[0]
+            slug = re.split(r"[\s(:]", str(c).strip(), maxsplit=1)[0]
             if st == "complete" and any(slug.startswith(x) for x in open_checks if x):
                 w["silent-green"] += 1
     oldest = {}

@@ -298,6 +298,29 @@ class CheckinVerify(unittest.TestCase):
         self.assertEqual(facts['gmail_opened'], 0)
         self.assertTrue(m.verify(run(), [], self.ledger(calls)))
 
+    def test_failed_run_never_closes_as_nothing_needs_you(self):
+        # PR #2 review: a consistent failed run verified and closed as "Nothing needs you."
+        r = run()
+        r.update(status='failed', watermark_after=r['watermark_before'], could_not=['Jira 502'])
+        out = self.close(r)
+        self.assertEqual(out['status_allowed'], 'failed')
+        self.assertIn('failed, will retry', out['final_line'])
+        self.assertIsNone(out['state_checkin'])
+
+    def test_count_given_as_text_is_an_error_not_a_crash(self):
+        # PR #2 review: gmail_opened "1" raised TypeError and close-out printed nothing.
+        for key, value in (('gmail_opened', '1'), ('gmail_listed', '1'), ('drive_docs_opened', -1)):
+            r = run()
+            r['coverage'][key] = value
+            errs = m.verify(r, [], self.ledger())
+            self.assertTrue(any(f'coverage.{key} must be a non-negative integer' in e for e in errs), errs)
+            out = self.close(r)
+            self.assertFalse(out['verified'])
+            self.assertEqual(out['status_allowed'], 'partial')
+        r = run()
+        r['findings_carried'] = '2'
+        self.assertTrue(any('findings_carried must be' in e for e in m.verify(r, [], self.ledger())))
+
     def test_malformed_new_source_lists_return_errors(self):
         for field in ('carried_sources', 'pending_in'):
             for value in ([None], ['bad'], {'bad': 'shape'}):

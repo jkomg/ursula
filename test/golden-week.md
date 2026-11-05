@@ -625,3 +625,27 @@ it), and unknown Gmail tools (already excluded by tool name). One gap was accept
 nothing showed `bin/ledger-log` actually writes the ids. A new test now feeds six real
 hook events through `bin/ledger-log` and gets three distinct ids. The suite is 74 tests,
 all passing. No second round was needed.
+
+### 5 Nov: PR #2 review comments (Codex connector), all three confirmed and fixed
+
+Each was reproduced against `d67ba83` before it was fixed:
+
+1. **A failed run closed as "Nothing needs you."** A consistent `status: failed` record
+   verified with no errors. Close-out only flagged `partial`, so its final line read as
+   all clear and `status_allowed` relabelled the run as `partial`. Now the final line
+   says "failed, will retry", `status_allowed` is `failed`, and an exception from the
+   verifier ends in a partial line instead of no output.
+2. **A count written as text crashed the verifier.** `gmail_opened: "1"` raised
+   `TypeError`. Every coverage count, plus `findings_carried` and `findings_resolved`,
+   is now validated as a non-negative integer, reported if it isn't, and treated as
+   missing.
+3. **silent-green used today's open findings.** A clean run on 1 Oct was flagged for a
+   finding first seen on 1 Nov. `audit_trend.py` now rebuilds the open set for each run's
+   date from `first_seen` and `closed_at`/`last_seen`.
+
+Also: `re.split` takes `maxsplit` by keyword (Python 3.14 deprecation warning).
+`python3 -m unittest discover -s test`: 79 tests pass (5 new, including a new
+`test/test_audit_trend.py`).
+Review: Mirantis LiteLLM, one round (`.handoffs/20261105-141355-litellm/`). No defects.
+It noted that nothing tests the verifier-exception fallback in `checkin_close.py`
+directly. That path is hard to reach now that counts are validated, and it remains untested.

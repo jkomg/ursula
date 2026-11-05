@@ -8,7 +8,8 @@ Prints one JSON object:
 
   verified        true only if scripts/checkin_verify.py passes, ledger included
   errors          what failed
-  status_allowed  "complete" only for a verified complete run, otherwise "partial"
+  status_allowed  "complete" only for a verified complete run; "failed" for a failed run;
+                  otherwise "partial"
   final_line      the one line for the operator, built from the record, the open findings
                   and the ledger, never from the model's recollection
   state_checkin   {watermark, slack_last_ts, pending_sources}, when safe to advance
@@ -58,7 +59,10 @@ def main(argv):
     if not Path(opts["--ledger"]).is_file():
         Path(opts["--ledger"]).parent.mkdir(parents=True, exist_ok=True)
         Path(opts["--ledger"]).touch()
-    errs = V.verify(run, findings, opts["--ledger"], opts.get("--slack-dm"))
+    try:
+        errs = V.verify(run, findings, opts["--ledger"], opts.get("--slack-dm"))
+    except Exception as e:   # a malformed record must still end in an honest final line
+        errs = [f"verifier could not read the run record: {type(e).__name__}: {e}"]
     facts, _ = V.ledger_facts(opts["--ledger"], this_session=True)
     verified = not errs
 
@@ -86,8 +90,10 @@ def main(argv):
     if not verified:
         gaps = [e.split(":", 1)[-1].strip()[:70] for e in errs[:3]]
         parts.append("partial, " + "; ".join(gaps) + (f" (+{len(errs) - 3} more)" if len(errs) > 3 else "") + ", will retry")
-    elif run.get("status") == "partial":
-        parts.append("partial, will retry")
+    elif run.get("status") in ("partial", "failed"):
+        # A failed run can be internally consistent and so verify; it still did not do
+        # its job, and must never reach the operator as "Nothing needs you." (PR #2 review).
+        parts.append(f"{run['status']}, will retry")
     parts += [f"{f['title'][:60]} (due {f['due_at'][:16].replace('T', ' ')})" for f in imminent[:3]]
     if len(imminent) > 3:
         parts.append(f"{len(imminent) - 3} more due soon")
@@ -104,7 +110,8 @@ def main(argv):
 
     out = {
         "verified": verified, "errors": errs,
-        "status_allowed": "complete" if verified and run.get("status") == "complete" else "partial",
+        "status_allowed": ("complete" if verified and run.get("status") == "complete"
+                           else "failed" if run.get("status") == "failed" else "partial"),
         "final_line": line,
         "carried": len(run.get("carried_sources") or []),
         "state_checkin": ({"watermark": run["window_end"], "slack_last_ts": run.get("slack_last_ts"),
